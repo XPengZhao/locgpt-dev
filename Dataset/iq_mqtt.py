@@ -10,10 +10,9 @@ from paho.mqtt import client as mqtt_client
 import test
 broker = 'localhost'
 port = 1883
-topic = "silabs/aoa/iq_report/ble-pd-90395E4B4F3F/ble-pd-6C5CB145BB3C"
-topic = "silabs/aoa/iq_report/ble-pd-0C4314F468E5/ble-pd-6C5CB145BB3C"
+topic = "silabs/aoa/iq_report/ble-pd-0C4314F46BF8/ble-pd-0C4314EF65A1"
 #topic = "silabs/aoa/iq_report/ble-pd-0C4314F468E5/ble-pd-30FB10D78788"
-filename = r'C:\Users\linqi\Desktop\620Data\基站倾角60度3米高无防水罩标签2.4米正对\ble_200m.txt'
+filename = r'data.txt'  
 # generate client ID with pub prefix randomly
 client_id = f'python-mqtt-{random.randint(0, 100)}'
 data_dict = {}
@@ -69,7 +68,7 @@ def draw():
         rssi_l.append(rssi)
         data_dict.clear()
         if cha >= 0:
-            m, n, el, intensity = test.cal(sa, cha)
+            m, n, el, el2, intensity = test.cal(sa, cha)
             if intensity < 2:
                 continue
             m_l.append(m)
