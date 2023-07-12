@@ -1,6 +1,8 @@
 import argparse
 import os
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+
 import numpy as np
 import pandas as pd
 import torch
