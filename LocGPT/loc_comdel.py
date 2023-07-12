@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
-logger = SummaryWriter('log')
+# logger = SummaryWriter('log')
 
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
