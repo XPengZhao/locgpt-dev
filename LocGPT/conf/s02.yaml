@@ -20,3 +20,4 @@ training:
   batch_size: 128
   total_epoches: 5100
   i_save: 1    # model save epoch
+  beta: 0.01   # loss weight

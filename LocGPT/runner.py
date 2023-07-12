@@ -2,9 +2,11 @@ import argparse
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+from shutil import copyfile
 
 import numpy as np
 import pandas as pd
+import scipy.io as scio
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -56,7 +58,7 @@ class LocGPT_Runner():
         self.logdir = kwargs_path['logdir']
         self.load_ckpt = kwargs_path['load_ckpt']
         self.train_file = kwargs_path['train_file']
-        self.test = kwargs_path['test_file']
+        self.test_file = kwargs_path['test_file']
 
         self.devices = torch.device('cuda')
         self.phase_encoder, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
@@ -79,12 +81,13 @@ class LocGPT_Runner():
         self.current_epoch = self.epoch_start
         self.batch_size = kwargs_train['batch_size']
         self.total_epoches = kwargs_train['total_epoches']
+        self.beta = kwargs_train['beta']
         self.i_save = kwargs_train['i_save']
 
 
         ## Dataset
-        train_data_dir = os.path.join(self.datadir, 'train_data-s02.csv')
-        test_data_dir = os.path.join(self.datadir, 'test_data-s02.csv')
+        train_data_dir = os.path.join(self.datadir, self.train_file)
+        test_data_dir = os.path.join(self.datadir, self.test_file)
         train_set = MyDataset(train_data_dir)
         test_set = MyDataset(test_data_dir)
         train_dataset = TensorDataset(*train_set.loaddata())
@@ -147,7 +150,7 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    def criterion(self, x, y, beta=0.01):
+    def criterion(self, x, y):
         def loss_l2(preds, labels):
             l_ = preds.shape[0]
             w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
@@ -161,7 +164,7 @@ class LocGPT_Runner():
         mse = nn.MSELoss()
         l1 = mse(x[:, 0], y[:, 0])
         l2, _ = loss_l2(x, y)
-        l3 = beta * l1 + (1-beta) * l2
+        l3 = self.beta * l1 + (1-self.beta) * l2
 
         return l1, l2, l3
 
@@ -250,6 +253,9 @@ class LocGPT_Runner():
 
         points_preds = points_preds @ R.T + t
         pos_error = dis2me(points_preds, points_labels)
+        scio.savemat(os.path.join(self.logdir, self.expname, "pos_error.mat"),
+                     {"pos_error":pos_error})
+
         print('Location Median Error', np.median(pos_error))
 
 
@@ -313,15 +319,18 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/temp.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/s02.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
     with open(args.config) as f:
         kwargs = yaml.safe_load(f)
         f.close()
+    ## backup config file
+    if args.mode == 'train':
+        copyfile(args.config, os.path.join(kwargs['path']['logdir'], kwargs['path']['expname'],'config.yaml'))
 
     worker = LocGPT_Runner(**kwargs, mode=args.mode)
     if args.mode == 'train':
