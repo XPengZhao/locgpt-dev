@@ -5,6 +5,7 @@ import array_index
 import aoa
 import aoa_1d
 import config
+import pika
 
 def cal(A: list,channel):
     I = A[0::2]
