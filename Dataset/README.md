@@ -11,6 +11,9 @@ array (locator) -> board -> raspiey (analyzer)
  /usr/local/sbin/mosquitto
 # run analyzer
 
+# check serial
+ls -l /dev/
+# /dev/ttyACM0
 
 ```
 
