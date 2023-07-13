@@ -72,7 +72,6 @@ class MQPublish():
         """发送消息
         """
         self.channel.basic_publish(exchange=self.exchange, routing_key=self.routing_key, body=data)
-        print("Send completed")
 
 
     def disconnect(self):

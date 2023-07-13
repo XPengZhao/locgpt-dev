@@ -1,12 +1,13 @@
-import rospy
-from nav_msgs.msg import Odometry
-import pika
 import json
 from datetime import datetime
-import numpy as np
-from rabbitmq import MQPublish
-import yaml
 
+import numpy as np
+import rospy
+import yaml
+from nav_msgs.msg import Odometry
+
+from rabbitmq import MQPublish
+from logger import logger
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -14,13 +15,14 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
+
 class Lidar_sniffer():
 
     def __init__(self, **kwargs) -> None:
 
         try:
             self.mq = MQPublish(**kwargs['mq'])
-            print("connect to server")
+            logger.info("connected to rabbitmq server")
         except:
             raise Exception("can't connect to localhost")
 
@@ -28,10 +30,11 @@ class Lidar_sniffer():
         self.node_name = kwargs['ros_node']['node_name']
         self.sniff_topic = kwargs['ros_node']['sniff_topic']
 
+
     def callback(self, data):
         position, rotation = data.pose.pose.position, data.pose.pose.rotation
 
-        print("Current position: x: {}, y: {}, z: {}".format(position.x, position.y, position.z))
+        logger.debug("Current position: x: %s, y: %s, z: %s", position.x, position.y, position.z)
 
         target_pos = np.array([position.x, position.y, position.z])
         # prepare the message as a JSON object
@@ -40,8 +43,8 @@ class Lidar_sniffer():
             'timestamp': datetime.now().isoformat()  # add current timestamp
         }, cls=NumpyEncoder)
 
-        self.mq.sendData(message) # replace 'lio_sam_position' with your desired queue name
-        print(" [x] Sent %r" % message)
+        self.mq.sendData(message)
+        logger.debug(" [x] Sent %r" % message)
 
 
     def listener(self):
