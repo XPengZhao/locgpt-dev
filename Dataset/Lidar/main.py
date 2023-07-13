@@ -6,14 +6,9 @@ import rospy
 import yaml
 from nav_msgs.msg import Odometry
 
-from rabbitmq import MQPublish
+from rabbitmq import MQPublish, NumpyEncoder
 from logger import logger
 
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
 
 
 class Lidar_sniffer():
@@ -33,7 +28,6 @@ class Lidar_sniffer():
 
     def callback(self, data):
         position, rotation = data.pose.pose.position, data.pose.pose.rotation
-
         logger.debug("Current position: x: %s, y: %s, z: %s", position.x, position.y, position.z)
 
         target_pos = np.array([position.x, position.y, position.z])
