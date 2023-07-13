@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""载入config.json参数
+""" load config.json
 """
 
 import json
