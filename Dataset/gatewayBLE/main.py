@@ -7,7 +7,7 @@ from paho.mqtt import client as mqtt_client
 from utils.get_timestamp import get_s_today, get_timestamp
 from utils.mqpublish import MQPublish
 from utils.param_loader import Paramloader
-
+from datetime import datetime
 
 broker = 'localhost'
 port = 1883
@@ -30,10 +30,13 @@ def connect_mqtt() -> mqtt_client:
     return client
 
 # MQTT
-def subscribe(client: mqtt_client, channel, key):
+def subscribe(client: mqtt_client, mc):
     def on_message(client, userdata, msg):
         # publish message to RabbitMQ
-        channel.basic_publish(exchange='', routing_key=key, body=msg.payload.decode('utf-8'))
+        # channel.basic_publish(exchange='', routing_key=key, body=msg.payload.decode('utf-8'))
+        data = json.loads(msg.payload.decode())
+        data_pub = {"frequency": data["channel"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+        mc.sendData(json.dumps(data_pub))
         print("Message received from MQTT and sent to RabbitMQ")
         # with open(filename, 'a') as f:
         #     f.write(f'{str(time.time())}\n{str(time.asctime())}\n{msg.payload.decode()}\n')
@@ -52,9 +55,16 @@ if __name__ == '__main__':
     try:
         mc.connect()
     except:
-        raise Exception("can't connect to localhost")
+        print(PM.ip)
+        raise Exception("can't connect to server")
     
+    broker = 'localhost'
+    port = 1883
+    topic = "silabs/aoa/iq_report/ble-pd-0C4314F46BF8/ble-pd-0C4314EF65A1"
+    client_id = f'python-mqtt-{random.randint(0, 100)}'
+    filename = r'./data.txt' 
+    print(client_id)
     # MQTT collect raw iq data
     client = connect_mqtt()
-    subscribe(client, mc.channel, mc.routing_key)
+    subscribe(client, mc)
     client.loop_forever()

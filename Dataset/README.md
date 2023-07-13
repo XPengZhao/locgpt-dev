@@ -6,6 +6,14 @@ BRD4109 antenna array: NCP locator
 
 array (locator) -> board -> raspiey (analyzer)
 
+```bash
+ # run mosquitto
+ /usr/local/sbin/mosquitto
+# run analyzer
+
+
+```
+
 ## BLE tag
 
 2 tags (aoa tag)

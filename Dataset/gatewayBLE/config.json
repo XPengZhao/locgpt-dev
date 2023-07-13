@@ -1,11 +1,11 @@
 {
   "gateway_name": "gateway1",
   "server": {
-    "ip": "158.132.255.118",
+    "ip": "158.132.255.177",
     "ip2": "10.68.48.100",
     "port": "5672",
-    "user": "admin",
-    "pwd": "admin"
+    "user": "tagsys",
+    "pwd": "123456"
   },
   "Gen2": {
     "SampleRate": 2,

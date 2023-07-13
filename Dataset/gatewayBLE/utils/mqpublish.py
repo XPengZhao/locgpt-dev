@@ -72,7 +72,7 @@ class MQPublish():
     def connect(self):
         """连接服务器
         """
-        credentials = pika.PlainCredentials(username='admin', password='admin')
+        credentials = pika.PlainCredentials(username='tagsys', password='123456')
         parameters = pika.ConnectionParameters(host=self.hostname, port=self.port, credentials=credentials)
         self.connection = pika.BlockingConnection(parameters=parameters)
 
