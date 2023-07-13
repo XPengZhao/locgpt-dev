@@ -51,30 +51,21 @@ class MQClient():
 
 
 class MQPublish():
+    """RabbitMQ Producer
     """
-    RabbitMQ客户端，对应接收机端
-    """
-    def __init__(self, hostname, port, routing_key):
-        """hostname IP； port 端口；
+    def __init__(self, ip, port, user, password, exchange, routing_key):
         """
-        self.routing_key = routing_key
-        self.exchange = "direct_gateway"
-        self.hostname = hostname
-        self.port = port
-
-
-    def connect(self):
-        """连接服务器
         """
-        credentials = pika.PlainCredentials(username='admin', password='admin')
-        parameters = pika.ConnectionParameters(host=self.hostname, port=self.port, credentials=credentials)
+        self.exchange, self.routing_key = exchange, routing_key
+
+        ## connecting to server
+        credentials = pika.PlainCredentials(username=user, password=password)
+        parameters = pika.ConnectionParameters(host=ip, port=port, credentials=credentials)
         self.connection = pika.BlockingConnection(parameters=parameters)
 
-        # 创建通道
+        # create exchange
         self.channel = self.connection.channel()
-
-        # 创建broker
-        self.channel.exchange_declare(exchange=self.exchange, exchange_type='direct')       #创建exchange
+        self.channel.exchange_declare(exchange=exchange, exchange_type='direct')       #创建exchange
 
 
     def sendData(self, data):

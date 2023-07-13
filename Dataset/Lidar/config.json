@@ -1,6 +1,0 @@
-{
-    "target_streamID":7,
-    "gateway_names":["gateway1", "gateway2", "gateway3"],
-    "IP": "158.132.255.118",
-    "Port": "5672"
-}
