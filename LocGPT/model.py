@@ -135,7 +135,7 @@ class Attention(nn.Module):
         return self.to_out(out)
 
 
-class Transformer(nn.Module):
+class Encoder(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
         super().__init__()
         self.layers = nn.ModuleList([])
@@ -146,6 +146,11 @@ class Transformer(nn.Module):
             ]))
 
     def forward(self, x):
+        """
+        Return
+        ----------
+        x: tensor, [B, n_seq, feature_dim]
+        """
         for attn, ff in self.layers:
             x = attn(x) + x
             x = ff(x) + x
@@ -177,7 +182,7 @@ class ViT(nn.Module):
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))					# nn.Parameter()定义可学习参数
         self.dropout = nn.Dropout(emb_dropout)
 
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+        self.transformer = Encoder(dim, depth, heads, dim_head, mlp_dim, dropout)
 
         self.pool = pool
         self.to_latent = nn.Identity()
@@ -201,9 +206,8 @@ class ViT(nn.Module):
         x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]                   # (b, dim)
 
         x = self.to_latent(x)                                                   # Identity (b, dim)
-        # print(x.shape)
 
-        return self.mlp_head(x), feature                                                 #  (b, num_classes)
+        return self.mlp_head(x), feature                                        #  (b, num_classes)
 
 
 
@@ -285,9 +289,9 @@ model_ch2 = vit_worker()
 model_ch3 = vit_worker()
 
 
-class MyVit(nn.Module):
+class LocGPT(nn.Module):
     def __init__(self):
-        super(MyVit, self).__init__()
+        super(LocGPT, self).__init__()
         self.vit1 = model_ch1
         self.vit2 = model_ch2
         self.vit3 = model_ch3
@@ -305,20 +309,17 @@ class MyVit(nn.Module):
         x2 = x[:, 1, :, :].unsqueeze(1)
         x3 = x[:, 2, :, :].unsqueeze(1)
 
-        x1, l1 = self.vit1(x1)
-        x2, l2 = self.vit2(x2)
-        x3, l3 = self.vit3(x3)
-        l1 = l1[:, 0]
-        l2 = l2[:, 0]
-        l3 = l3[:, 0]
+        omega1, encoder_output1 = self.vit1(x1)
+        omega2, encoder_output2 = self.vit2(x2)
+        omega3, encoder_output3 = self.vit3(x3)
 
-        x_angle_1 = x1
-        x_angle_2 = x2
-        x_angle_3 = x3
-        s = area(x_angle_1, x_angle_2, x_angle_3)
+        l1 = encoder_output1[:, 0]
+        l2 = encoder_output2[:, 0]
+        l3 = encoder_output3[:, 0]
+
+        s = area(omega1, omega2, omega3)
 
         f = torch.cat((l1, l2, l3), dim=1)
-        # print(f)
         p = self.mlp(f)
         return torch.cat((s, p), dim=1)
 
