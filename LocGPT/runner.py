@@ -1,6 +1,8 @@
 import argparse
 import os
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+
 import numpy as np
 import pandas as pd
 import torch
@@ -15,7 +17,7 @@ from tqdm import tqdm
 from model import *
 
 dis2mse = lambda x, y: torch.mean((x - y) ** 2)
-dis2me = lambda x, y: np.linalg.norm(x - y)
+dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
 
 
 class MyDataset(Dataset):
@@ -61,7 +63,7 @@ class LocGPT_Runner():
 
         ## Network
         self.locgpt = LocGPT().to(self.devices)
-        if kwargs_network['init_weight']:
+        if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
         params = list(self.locgpt.parameters())
@@ -145,7 +147,7 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    def criterion(self, x, y, beta=0.1):
+    def criterion(self, x, y, beta=0.01):
         def loss_l2(preds, labels):
             l_ = preds.shape[0]
             w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
@@ -287,10 +289,10 @@ class LocGPT_Runner():
         t = nn.Parameter(torch.zeros(3))  # Initialize translation vector as zero
 
         # Set up the optimizer
-        optimizer = optim.SGD([R, t], lr=0.01)
+        optimizer = optim.SGD([R, t], lr=0.05)
 
         # Training loop
-        for i in range(1000):  # 1000 iterations
+        for i in range(10000):  # 1000 iterations
             optimizer.zero_grad()  # Clear previous gradients
 
             # Apply the transformation
@@ -299,7 +301,7 @@ class LocGPT_Runner():
             loss.backward()
             optimizer.step()
 
-            if i % 100 == 0:  # Print loss every 100 iterations
+            if i % 500 == 0:  # Print loss every 100 iterations
                 print(f"Iteration {i}: Loss = {loss.item()}")
 
         return R, t

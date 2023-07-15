@@ -1,0 +1,28 @@
+{
+  "gateway_name": "gateway1",
+  "server": {
+    "ip": "158.132.255.177",
+    "ip2": "10.68.48.100",
+    "port": "5672",
+    "user": "tagsys",
+    "pwd": "123456"
+  },
+  "Gen2": {
+    "SampleRate": 2,
+    "BLF": 160,
+    "Tari": 10,
+    "RTCal": 100,
+    "Encoding": 4,
+    "FrT": 0.1
+  },
+  "MultiTag": {
+    "TagNum": 1,
+    "T2Length": [90]
+  },
+  "Array": {
+    "CycleDuration": 50,
+    "arrT1Duration": 50,
+    "arrT2Duration": 60,
+    "arrT3Duration": 70
+  }
+}
