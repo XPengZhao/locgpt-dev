@@ -11,8 +11,23 @@ from datetime import datetime
 
 broker = 'localhost'
 port = 1883
+
+# gateway 1
 topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-0C4314EF65A1"
 topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-B43A31EEB7B6"
+
+# gateway 2
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-B43A31EEB7B6"
+
+# gateway 3
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-B43A31EEB7B6"
+
+# gateway 4
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-B43A31EEB7B6"
+
 topic_array = [(topic, 0), (topic2, 1)]
 client_id = f'python-mqtt-{random.randint(0, 100)}'
 filename = r'./data.txt' 
