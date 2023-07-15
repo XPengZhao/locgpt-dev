@@ -60,7 +60,7 @@ class LocGPT_Runner():
         self.phase_encoder, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
         ## Network
-        self.locgpt = MyVit().to(self.devices)
+        self.locgpt = LocGPT().to(self.devices)
         if kwargs_network['init_weight']:
             self.locgpt.apply(self.init_weights)
 
@@ -313,7 +313,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='conf/temp.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
