@@ -53,10 +53,10 @@ def subscribe(client: mqtt_client, mc):
         # channel.basic_publish(exchange='', routing_key=key, body=msg.payload.decode('utf-8'))
         data = json.loads(msg.payload.decode())
         if msg.topic == topic:
-            data_pub = {"id":1, "frequency": data["channel"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+            data_pub = {"id":1, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
             print("tag 1")
         elif msg.topic == topic2:
-            data_pub = {"id":2, "frequency": data["channel"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+            data_pub = {"id":2, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
             print("tag 2")
         mc.sendData(json.dumps(data_pub))
         print("Message received from MQTT and sent to RabbitMQ")
