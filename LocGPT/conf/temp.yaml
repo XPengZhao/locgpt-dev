@@ -1,6 +1,6 @@
 ## Path settings
 path:
-  expname: exp1-s02
+  expname: exp2-s02
   datadir: data/mcbench/
   logdir: logs/mcbench/
   train_file: train_data-s02.csv
@@ -18,5 +18,5 @@ training:
   lr: 1e-4
   weight_decay: 1e-4
   batch_size: 128
-  total_epoches: 5100
+  total_epoches: 17000
   i_save: 1    # model save epoch
