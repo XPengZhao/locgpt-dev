@@ -159,7 +159,7 @@ class PreNorm(nn.Module):
         return self.fn(self.norm(x), **kwargs)
 
 
-class PreNorm_Behind(nn.Module):
+class PostNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
@@ -339,9 +339,9 @@ class Decoder(nn.Module):
     self.layers = nn.ModuleList([])
     for _ in range(depth):
         self.layers.append(nn.ModuleList([
-            PreNorm_Behind(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder
-            PreNorm_Behind(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder-encoder
-            PreNorm_Behind(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+            PostNorm(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder
+            PostNorm(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder-encoder
+            PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
         ]))
 
   def forward(self, dec_input, enc_output, enc_input):
