@@ -79,8 +79,6 @@ def get_embedder(multires, input_ch, enable=True):
     return embed, embedder_obj.out_dim
 
 
-
-
 class PositionalEncoding(nn.Module):
 
   def __init__(self, d_model, dropout=.1, max_len=1024):
@@ -112,51 +110,43 @@ class PositionalEncoding(nn.Module):
 
 
 def get_attn_pad_mask(seq_q, seq_k):
-  '''
-  Padding, because of unequal in source_len and target_len.
+    '''
+    Padding, because of unequal in source_len and target_len.
 
-  parameters:
-  seq_q: [batch, seq_len]
-  seq_k: [batch, seq_len]
+    parameters:
+    -------------
+    seq_q: [batch, seq_len]
+    seq_k: [batch, seq_len]
 
-  return:
-  mask: [batch, len_q, len_k]
+    return:
+    -------------
+    mask: [batch, len_q, len_k]
+    '''
+    batch, len_q = seq_q.size()
+    batch, len_k = seq_k.size()
+    # we define index of PAD is 0, if tensor equals (zero) PAD tokens
+    pad_attn_mask = seq_k.data.eq(0).unsqueeze(1) # [batch, 1, len_k]
 
-  '''
-  batch, len_q = seq_q.size()
-  batch, len_k = seq_k.size()
-  # we define index of PAD is 0, if tensor equals (zero) PAD tokens
-  pad_attn_mask = seq_k.data.eq(0).unsqueeze(1) # [batch, 1, len_k]
-
-  return pad_attn_mask.expand(batch, len_q, len_k) # [batch, len_q, len_k]
+    return pad_attn_mask.expand(batch, len_q, len_k) # [batch, len_q, len_k]
 
 
 
 def get_attn_subsequent_mask(seq):
-  '''
-  Build attention mask matrix for decoder when it autoregressing.
+    '''
+    Build attention mask matrix for decoder when it autoregressing.
 
-  parameters:
-  seq: [batch, target_len]
+    parameters:
+    seq: [batch, target_len]
 
-  return:
-  subsequent_mask: [batch, target_len, target_len]
-  '''
-  attn_shape = [seq.size(0), seq.size(1), seq.size(1)] # [batch, target_len, target_len]
-  subsequent_mask = np.triu(np.ones(attn_shape), k=1) # [batch, target_len, target_len]
-  subsequent_mask = torch.from_numpy(subsequent_mask)
+    return:
+    subsequent_mask: [batch, target_len, target_len]
+    '''
+    attn_shape = [seq.size(0), seq.size(1), seq.size(1)] # [batch, target_len, target_len]
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1) # [batch, target_len, target_len]
+    subsequent_mask = torch.from_numpy(subsequent_mask)
 
-  return subsequent_mask # [batch, target_len, target_len]
+    return subsequent_mask # [batch, target_len, target_len]
 
-
-
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.fn = fn
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
 
 
 class PostNorm(nn.Module):
@@ -201,9 +191,9 @@ class Attention(nn.Module):
         ) if project_out else nn.Identity()
 
 
-    def forward(self, x, attn_mask=None):
-        b, n, _, h = *x.shape, self.heads               # n: seq length, _: feature_dim
-        qkv = self.to_qkv(x).chunk(3, dim=-1)           # (b, n(65), dim*3) ---> 3 * (b, n, dim)
+    def forward(self, inputs, attn_mask=None):
+        b, n, _, h = *inputs.shape, self.heads               # n: seq length, _: feature_dim
+        qkv = self.to_qkv(inputs).chunk(3, dim=-1)           # (b, n(65), dim*3) ---> 3 * (b, n, dim)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)          # q, k, v   (b, h, n, dim_head(64))
 
         dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
@@ -252,27 +242,31 @@ class Attention2(nn.Module):
         return self.to_out(out)
 
 
-
 class Encoder(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+                PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
+                PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
             ]))
+        self.mlp_head = nn.Linear(dim, 2)
 
-    def forward(self, x):
+
+    def forward(self, enc_input):
         """
         Return
         ----------
-        x: tensor, [B, n_seq, feature_dim]
+        enc_input: tensor, [B, n_seq, feature_dim]
         """
         for attn, ff in self.layers:
-            x = attn(x) + x
-            x = ff(x) + x
-        return x
+            x = attn(enc_input, inputs=enc_input)
+            x = ff(x, inputs=x)
+
+        omega = self.mlp_head(x)  # [B, n_seq, 2]
+
+        return omega, x
 
 
 class ViT(nn.Module):
@@ -334,7 +328,7 @@ class Decoder(nn.Module):
     super().__init__()
 
     self.pos_embedding = nn.Parameter(torch.randn(1, 1, dim))
-    self.pe = nn.Linear(1, dim)
+    self.pe = nn.Linear(3, dim)
 
     self.layers = nn.ModuleList([])
     for _ in range(depth):
@@ -344,7 +338,7 @@ class Decoder(nn.Module):
             PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
         ]))
 
-  def forward(self, dec_input, enc_output, enc_input):
+  def forward(self, enc_token, enc_output, dec_token, dec_input):
     '''
     Params:
     ------------------
@@ -359,13 +353,12 @@ class Decoder(nn.Module):
 
     #  decoder_self_mask: [batch, trace_len, trace_len]
     #  decoder_encoder_mask: [B, trace_len, phase_len]
-    dec_self_attn_mask = get_attn_pad_mask(dec_input, dec_input) # [batch, target_len, target_len]
-    dec_subsequent_mask = get_attn_subsequent_mask(dec_input).cuda() # [batch, target_len, target_len]
-    enc_input = torch.concat((torch.ones(len(enc_input),1).to(enc_input.device), enc_input), dim=-1)  # cls
-    decoder_encoder_attn_mask = get_attn_pad_mask(dec_input, enc_input) # [batch, target_len, source_len]
+    dec_self_attn_mask = get_attn_pad_mask(dec_token, dec_token) # [batch, target_len, target_len]
+    dec_subsequent_mask = get_attn_subsequent_mask(dec_token).cuda() # [batch, target_len, target_len]
+    decoder_encoder_attn_mask = get_attn_pad_mask(dec_token, enc_token) # [batch, target_len, source_len]
     decoder_self_mask = torch.gt(dec_self_attn_mask + dec_subsequent_mask, 0)
 
-    dec_input = self.pe(dec_input[...,None])
+    dec_input = self.pe(dec_input)
     dec_input += self.pos_embedding[:, :1]                  # 加位置嵌入（直接加）      (b, 1, dim)
     # masked mutlihead attention
     # in attn 1, Q, K, V all from decoder it self
@@ -378,80 +371,19 @@ class Decoder(nn.Module):
 
 
 
-class TNetwork_MLP(nn.Module):
-    def __init__(self, D=8, W=256, input_ch=256, output_ch=3, skips=[4]):
-        """input + 8 hidden layer + output
-
-        Parameters
-        ----------
-        D : hidden layer number
-        W : Dimension per hidden layer
-        input_ch : int, input channel, by default 256
-        output_ch : int, out channel, by default 3
-        skip : list, residual layer, optional
-        """
-        super().__init__()
-        self.D, self.W = D, W
-        self.input_ch = input_ch
-        self.output_ch = output_ch
-
-        self.skips = skips
-        self.num_layers = D + 2    # hidden + input + output
-
-        self.linears = nn.ModuleList(
-            [nn.Linear(input_ch, W)] +
-            [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W)
-             for i in range(D - 1)]
-        )
-        # self.pos_bn = nn.ModuleList([nn.BatchNorm1d(W) for i in range(D)])
-        self.output_layer = nn.Linear(W, output_ch)
-
-        self.activation = nn.Softplus(beta=100)
-
-
-
-    def forward(self, inputs):
-        """forward function of the model
-
-        Parameters
-        ----------
-        x : [batchsize ,input]
-
-        Returns
-        ----------
-        outputs: [batchsize, 3].   position
-        """
-        inputs = inputs.to(torch.float32)
-        h = inputs
-
-        for i, layer in enumerate(self.linears):
-            h = layer(h)
-            # h = F.relu(h)
-            h = self.activation(h)
-            if i in self.skips:
-                h = torch.cat([inputs, h], -1)
-
-        pos = self.output_layer(h)    # (batch_size, 3)
-        return pos
-
-
-
-def vit_worker():
-    model_vit = ViT(
-            image_size = (16, 20),
-            patch_size = (1, 20),
-            channels = 1,
-            num_classes = 2,  # alpha, beta
-            dim = 20,
+def enc_worker():
+    model_encoder = Encoder(
+            dim = 324,
             depth = 2,
             heads = 8,
+            dim_head = 64,
             mlp_dim = 1024,
             dropout = 0.1,
-            emb_dropout = 0.1
         )
-    return model_vit
+    return model_encoder
 
-def decoder_worker():
+
+def dec_worker():
     model_decoder = Decoder(
             dim = 20,
             depth = 2,
@@ -463,39 +395,40 @@ def decoder_worker():
     return model_decoder
 
 
-model_ch1 = vit_worker()
-model_ch2 = vit_worker()
-model_ch3 = vit_worker()
-model_decoder = decoder_worker()
 
 
 class LocGPT(nn.Module):
     def __init__(self):
         super(LocGPT, self).__init__()
-        self.vit1 = model_ch1
-        self.vit2 = model_ch2
-        self.vit3 = model_ch3
-        self.decoder = model_decoder
+        self.encoder1 = enc_worker()
+        self.encoder2 = enc_worker()
+        self.encoder3 = enc_worker()
+        self.decoder = dec_worker()
         self.pos_linear = nn.Linear(20, 3, bias=False)
         self.pe, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
 
-    def forward(self, phase_input, dec_input, gateway_pos):
+    def forward(self, enc_token, enc_input, dec_token, dec_input, gateway_pos):
+        """
+        Params
+        --------------
+        enc_token: tensor, [B, n_seq]. The index of spectrum as the input of encoder
+        enc_input: tensor, [B, n_seq, n_gateway, spt_dim]
+        dec_token: [B, n_seq]
+        dec_input: [B, n_seq, 3]
+        """
 
-        enc_input = self.pe(phase_input[..., None])    # [B, 3, 16, 20]
-
-        x1 = enc_input[:, 0, :, :].unsqueeze(1)
-        x2 = enc_input[:, 1, :, :].unsqueeze(1)
-        x3 = enc_input[:, 2, :, :].unsqueeze(1)
-
-        omega1, enc_output1 = self.vit1(x1)
-        omega2, enc_output2 = self.vit2(x2)
-        omega3, enc_output3 = self.vit3(x3)
+        omega1, enc_output1 = self.encoder1(enc_input[..., 0, :])
+        omega2, enc_output2 = self.encoder2(enc_input[..., 1, :])
+        omega3, enc_output3 = self.encoder3(enc_input[..., 2, :])
 
         enc_output = enc_output1 + enc_output2 + enc_output3
+
+        #NOTE
         s = area(omega1, omega2, omega3)
 
-        dec_output = self.decoder(dec_input, enc_output, phase_input[:,0,:])
+        #NOTE
+        dec_output = self.decoder(enc_token, enc_output, dec_token, dec_input)
         pos = self.pos_linear(dec_output).squeeze()
 
         return torch.cat((s, pos), dim=1)
