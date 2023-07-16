@@ -61,10 +61,9 @@ class LocGPT_Runner():
         self.test_file = kwargs_path['test_file']
 
         self.devices = torch.device('cuda')
-        self.phase_encoder, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
         ## Network
-        self.locgpt = MyVit().to(self.devices)
+        self.locgpt = LocGPT().to(self.devices)
         if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
@@ -180,12 +179,13 @@ class LocGPT_Runner():
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (data, target) in enumerate(self.train_iter):
 
-                    data, target = data.to(self.devices), target.to(self.devices) # data [B, 3, 16]
-                    phase_input = self.phase_encoder(data[..., None])    # [B, 3, 16, 20]
+                    phase_input, target = data.to(self.devices), target.to(self.devices) # data [B, 3, 16]
+
+                    decoder_input = torch.ones((len(phase_input),1)).cuda()
 
                     label, pos = target[:, :4], target[:, 4:]
                     self.optimizer.zero_grad()
-                    output = self.locgpt(phase_input, pos)
+                    output = self.locgpt(phase_input, decoder_input, pos)
                     l1, l2, l3 = self.criterion(output, label)
                     loss = l3
                     loss.backward()
@@ -218,14 +218,16 @@ class LocGPT_Runner():
         pred_all = np.zeros((dataset_len, 4))
 
         for i, (data, target) in enumerate(dataset):
-            data = data.to(self.devices)  # [B, 3, 16]
-            phase_input = self.phase_encoder(data[..., None])    # [B, 3, 16, 20]
+            phase_input = data.to(self.devices)  # [B, 3, 16]
+
             test_labels = target[:, :4].numpy()
             test_pos = target[:, 4:]
             test_pos = test_pos.to(self.devices)
 
+            decoder_input = torch.ones((len(phase_input),1)).cuda()
+
             with torch.no_grad():
-                preds = self.locgpt(phase_input, test_pos).cpu().detach().numpy()  # [B, 4]
+                preds = self.locgpt(phase_input, decoder_input, test_pos).cpu().detach().numpy()  # [B, 4]
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = test_labels
 
