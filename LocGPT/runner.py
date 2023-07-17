@@ -181,13 +181,15 @@ class LocGPT_Runner():
 
                     spt = self.train_spt[enc_token].to(self.devices)
                     label = self.train_label[dec_token].to(self.devices)
-                    area_tagpos, gateway_pos = label[:, :4], label[:, 4:]
+                    area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
                     enc_token = enc_token.to(self.devices, dtype=torch.int32)
                     dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
+                    dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
 
                     self.optimizer.zero_grad()
-                    output = self.locgpt(enc_token, spt, dec_token, area_tagpos[:,:3], gateway_pos)
-                    l1, l2, l3 = self.criterion(output, area_tagpos)
+                    # output = self.locgpt(enc_token, spt, dec_token, area_tagpos[...,1:4], gateway_pos)
+                    output = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos)
+                    l1, l2, l3 = self.criterion(output.squeeze(), area_tagpos.squeeze())
                     loss = l3
                     loss.backward()
 
@@ -218,17 +220,24 @@ class LocGPT_Runner():
         gt_all = np.zeros((dataset_len, 4))
         pred_all = np.zeros((dataset_len, 4))
 
-        for i, (data, target) in enumerate(dataset):
-            data = data.to(self.devices)  # [B, 3, 16]
-            phase_input = self.phase_encoder(data[..., None])    # [B, 3, 16, 20]
-            test_labels = target[:, :4].numpy()
-            test_pos = target[:, 4:]
-            test_pos = test_pos.to(self.devices)
+        for i, (enc_token, dec_token) in enumerate(dataset):
+
+            spt = self.train_spt[enc_token].to(self.devices)
+            label = self.train_label[dec_token]
+            area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
+            test_labels = area_tagpos.squeeze().numpy()
+            enc_token = enc_token.to(self.devices, dtype=torch.int32)
+            dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
+            dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
+
 
             with torch.no_grad():
-                preds = self.locgpt(phase_input, test_pos).cpu().detach().numpy()  # [B, 4]
+                preds = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos).squeeze()
+                preds = preds.cpu().detach().numpy()  # [B, 4]
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = test_labels
+
+
 
         return pred_all, gt_all
 
@@ -321,8 +330,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='conf/s02-enc-dec.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='train')
+    parser.add_argument('--gpu', type=int, default=1)
+    parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 

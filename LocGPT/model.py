@@ -359,7 +359,7 @@ class Decoder(nn.Module):
     decoder_self_mask = torch.gt(dec_self_attn_mask + dec_subsequent_mask, 0)
 
     dec_input = self.pe(dec_input)
-    dec_input += self.pos_embedding[:, :1]                  # 加位置嵌入（直接加）      (b, 1, dim)
+    dec_input += self.pos_embedding                  # 加位置嵌入（直接加）      (b, 1, dim)
     # masked mutlihead attention
     # in attn 1, Q, K, V all from decoder it self
     # decoder_self_attn: [batch, n_heads, target_len, target_len]
@@ -385,7 +385,7 @@ def enc_worker():
 
 def dec_worker():
     model_decoder = Decoder(
-            dim = 20,
+            dim = 324,
             depth = 2,
             heads = 8,
             dim_head = 64,
@@ -404,7 +404,7 @@ class LocGPT(nn.Module):
         self.encoder2 = enc_worker()
         self.encoder3 = enc_worker()
         self.decoder = dec_worker()
-        self.pos_linear = nn.Linear(20, 3, bias=False)
+        self.pos_linear = nn.Linear(324, 3, bias=False)
         self.pe, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
 
@@ -417,6 +417,7 @@ class LocGPT(nn.Module):
         dec_token: [B, n_seq]
         dec_input: [B, n_seq, 3]
         """
+        B, n_seq = enc_token.shape
 
         omega1, enc_output1 = self.encoder1(enc_input[..., 0, :])
         omega2, enc_output2 = self.encoder2(enc_input[..., 1, :])
@@ -424,12 +425,13 @@ class LocGPT(nn.Module):
 
         enc_output = enc_output1 + enc_output2 + enc_output3
 
-        #NOTE
-        s = area(omega1, omega2, omega3)
+        s = torch.zeros((B, n_seq, 1), dtype=torch.float32).to(omega1.device)
+        for i in range(n_seq): # [B, n_seq, 2]
+            s[:,i] = area(omega1[:,i], omega2[:,i], omega3[:,i])
 
         #NOTE
         dec_output = self.decoder(enc_token, enc_output, dec_token, dec_input)
-        pos = self.pos_linear(dec_output).squeeze()
+        pos = self.pos_linear(dec_output)
 
-        return torch.cat((s, pos), dim=1)
+        return torch.cat((s, pos), dim=-1)
 
