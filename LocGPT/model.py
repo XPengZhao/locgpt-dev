@@ -158,7 +158,6 @@ class PostNorm(nn.Module):
         return self.norm(self.fn(**kwargs) + x)
 
 
-
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.):
         super().__init__()
@@ -174,39 +173,6 @@ class FeedForward(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
-        super().__init__()
-        inner_dim = dim_head * heads    # dim_head concat
-        project_out = not (heads == 1 and dim_head == dim)
-
-        self.heads = heads
-        self.scale = dim_head ** -0.5
-
-        self.attend = nn.Softmax(dim=-1)
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
-
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout),
-        ) if project_out else nn.Identity()
-
-
-    def forward(self, inputs, attn_mask=None):
-        b, n, _, h = *inputs.shape, self.heads               # n: seq length, _: feature_dim
-        qkv = self.to_qkv(inputs).chunk(3, dim=-1)           # (b, n(65), dim*3) ---> 3 * (b, n, dim)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)          # q, k, v   (b, h, n, dim_head(64))
-
-        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
-        if attn_mask:
-            dots.masked_fill_(attn_mask, -1e9)
-        attn = self.attend(dots)
-
-        out = einsum('b h i j, b h j d -> b h i d', attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
-        return self.to_out(out)
-
-
-class Attention2(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
         super().__init__()
         inner_dim = dim_head * heads    # dim_head concat
@@ -261,7 +227,7 @@ class Encoder(nn.Module):
         enc_input: tensor, [B, n_seq, feature_dim]
         """
         for attn, ff in self.layers:
-            x = attn(enc_input, inputs=enc_input)
+            x = attn(enc_input, q_input=enc_input, k_input=enc_input, v_input=enc_input)
             x = ff(x, inputs=x)
 
         omega = self.mlp_head(x)  # [B, n_seq, 2]
@@ -333,8 +299,8 @@ class Decoder(nn.Module):
     self.layers = nn.ModuleList([])
     for _ in range(depth):
         self.layers.append(nn.ModuleList([
-            PostNorm(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder
-            PostNorm(dim, Attention2(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder-encoder
+            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder
+            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder-encoder
             PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
         ]))
 
@@ -371,40 +337,14 @@ class Decoder(nn.Module):
 
 
 
-def enc_worker():
-    model_encoder = Encoder(
-            dim = 324,
-            depth = 2,
-            heads = 8,
-            dim_head = 64,
-            mlp_dim = 1024,
-            dropout = 0.1,
-        )
-    return model_encoder
-
-
-def dec_worker():
-    model_decoder = Decoder(
-            dim = 324,
-            depth = 2,
-            heads = 8,
-            dim_head = 64,
-            mlp_dim = 1024,
-            dropout = 0.1,
-        )
-    return model_decoder
-
-
 
 
 class LocGPT(nn.Module):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(LocGPT, self).__init__()
-        self.encoder1 = enc_worker()
-        self.encoder2 = enc_worker()
-        self.encoder3 = enc_worker()
-        self.decoder = dec_worker()
-        self.pos_linear = nn.Linear(324, 3, bias=False)
+        self.encoder1, self.encoder2, self.encoder3 = [Encoder(**kwargs) for _ in range(3)]
+        self.decoder = Decoder(**kwargs)
+        self.pos_linear = nn.Linear(kwargs['dim'], 3, bias=False)
         self.pe, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
 

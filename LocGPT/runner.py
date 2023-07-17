@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""LocGPT runner
+"""
 import argparse
 import os
 
@@ -16,7 +19,7 @@ from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm
 
-from model import *
+from model import LocGPT
 
 dis2mse = lambda x, y: torch.mean((x - y) ** 2)
 dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
@@ -58,10 +61,9 @@ class LocGPT_Runner():
         self.test_file = kwargs_path['test_file']
 
         self.devices = torch.device('cuda')
-        self.phase_encoder, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
         ## Network
-        self.locgpt = LocGPT().to(self.devices)
+        self.locgpt = LocGPT(**kwargs_network["transformer"]).to(self.devices)
         if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
@@ -330,8 +332,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='conf/s02-enc-dec.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=1)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
