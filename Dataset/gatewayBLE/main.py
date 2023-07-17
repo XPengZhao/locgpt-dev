@@ -11,7 +11,24 @@ from datetime import datetime
 
 broker = 'localhost'
 port = 1883
-topic = "silabs/aoa/iq_report/ble-pd-0C4314F46BF8/ble-pd-0C4314EF65A1"
+
+# gateway 1
+topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-0C4314EF65A1"
+topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-B43A31EEB7B6"
+
+# gateway 2
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-B43A31EEB7B6"
+
+# gateway 3
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-B43A31EEB7B6"
+
+# gateway 4
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-B43A31EEB7B6"
+
+topic_array = [(topic, 0), (topic2, 1)]
 client_id = f'python-mqtt-{random.randint(0, 100)}'
 filename = r'./data.txt' 
 
@@ -35,7 +52,12 @@ def subscribe(client: mqtt_client, mc):
         # publish message to RabbitMQ
         # channel.basic_publish(exchange='', routing_key=key, body=msg.payload.decode('utf-8'))
         data = json.loads(msg.payload.decode())
-        data_pub = {"frequency": data["channel"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+        if msg.topic == topic:
+            data_pub = {"id":1, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+            print("tag 1")
+        elif msg.topic == topic2:
+            data_pub = {"id":2, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+            print("tag 2")
         mc.sendData(json.dumps(data_pub))
         print("Message received from MQTT and sent to RabbitMQ")
         # with open(filename, 'a') as f:
@@ -44,7 +66,7 @@ def subscribe(client: mqtt_client, mc):
         # for name, value in data.items():
         #     data_dict.setdefault(name, queue.LifoQueue()).put(value)
 
-    client.subscribe(topic)
+    client.subscribe(topic_array)
     client.on_message = on_message
     
 
@@ -60,7 +82,7 @@ if __name__ == '__main__':
     
     broker = 'localhost'
     port = 1883
-    topic = "silabs/aoa/iq_report/ble-pd-0C4314F46BF8/ble-pd-0C4314EF65A1"
+ 
     client_id = f'python-mqtt-{random.randint(0, 100)}'
     filename = r'./data.txt' 
     print(client_id)

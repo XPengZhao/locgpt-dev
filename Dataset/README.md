@@ -6,13 +6,6 @@ BRD4109 antenna array: NCP locator
 
 array (locator) -> board -> raspiey (analyzer)
 
-```bash
- # run mosquitto
- /usr/local/sbin/mosquitto
-# run analyzer
-
-
-```
 
 ## BLE tag
 
@@ -21,12 +14,6 @@ array (locator) -> board -> raspiey (analyzer)
 ## Ground Truth
 
 Lidar (LIO-SAM, https://github.com/TixiaoShan/LIO-SAM)
-
-
-
-
-
-
 
 ## BLE Data Format
 

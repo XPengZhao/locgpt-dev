@@ -1,0 +1,23 @@
+## Path settings
+path:
+  expname: exp2-s02
+  datadir: data/mcbench/
+  logdir: logs/mcbench/
+  train_file: train_data-s02.csv
+  test_file: test_data-s02.csv
+  load_ckpt: True
+
+
+## Network settings
+networks:
+  init_weight: true
+
+
+## Training settings
+training:
+  lr: 1e-4
+  weight_decay: 1e-4
+  batch_size: 128
+  total_epoches: 17000
+  i_save: 1    # model save epoch
+  beta: 0.01   # loss weight

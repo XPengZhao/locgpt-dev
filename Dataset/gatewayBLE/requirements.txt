@@ -1,0 +1,3 @@
+numpy==1.23.5
+paho_mqtt==1.6.1
+pika==1.3.2
