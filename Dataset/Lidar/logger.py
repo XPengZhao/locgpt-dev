@@ -43,5 +43,5 @@ def logger_config(log_savepath,logging_name):
 # log_filename = now.strftime("%Y-%m-%d_%H-%M-%S.log")
 
 log_filename = "lidar.log"
-log_savepath = f'log/{log_filename}'
+log_savepath = f'logs/{log_filename}'
 logger = logger_config(log_savepath=log_savepath, logging_name='lidar')

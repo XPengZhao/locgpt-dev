@@ -27,14 +27,20 @@ class Lidar_sniffer():
 
 
     def callback(self, data):
-        position, rotation = data.pose.pose.position, data.pose.pose.rotation
-        logger.debug("Current position: x: %s, y: %s, z: %s", position.x, position.y, position.z)
+
+        timestamp = data.header.stamp
+        timestamp = timestamp.to_sec()
+        timestamp = datetime.fromtimestamp(timestamp).isoformat()
+        position, orientation = data.pose.pose.position, data.pose.pose.orientation
+
+        logger.debug("Current timestamp %s - position: x: %s, y: %s, z: %s", timestamp, position.x, position.y, position.z)
 
         target_pos = np.array([position.x, position.y, position.z])
         # prepare the message as a JSON object
         message = json.dumps({
-            'target': target_pos,
-            'timestamp': datetime.now().isoformat()  # add current timestamp
+            'timestamp': timestamp,  # add current timestamp
+            'position': [position.x, position.y, position.z],
+            'orientation': [orientation.x, orientation.y, orientation.z, orientation.w]
         }, cls=NumpyEncoder)
 
         self.mq.sendData(message)
