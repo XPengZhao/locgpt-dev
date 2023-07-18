@@ -1,6 +1,6 @@
 ## Path settings
 path:
-  expname: exp4-s02
+  expname: exp5-s02        ## exp5 Add padding mask
   datadir: data/transformer-test/
   logdir: logs/mcbench/
   train_file: train_data-s02.t
@@ -31,7 +31,7 @@ networks:
 training:
   lr: 1e-4
   weight_decay: 1e-4
-  batch_size: 20
+  batch_size: 32
   total_epoches: 10000
   i_save: 1    # model save epoch
   beta: 0.01   # loss weight

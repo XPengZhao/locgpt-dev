@@ -152,12 +152,19 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    def criterion(self, x, y):
+    def criterion(self, x, y, mask):
         """
         Parameters
         --------------
         x: [B, n_seq, 4]. area+pos
+        mask: [B, n_seq]
         """
+        mask = mask.unsqueeze(-1)
+        mask = torch.logical_not(mask).float().to(self.devices)
+
+        # Apply the mask to x and y
+        x = x * mask
+        y = y * mask
 
         mse = nn.MSELoss()
         l1 = mse(x[..., 0], y[..., 0])
@@ -178,9 +185,8 @@ class LocGPT_Runner():
         for epoch in range(self.epoch_start, self.total_epoches):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
-                    B, n_seq = enc_token.shape
-                    spt = self.train_spt[enc_token.squeeze()].to(self.devices)   # [B, n_seq, 3*9*36]
-                    label = self.train_label[dec_token.squeeze()].to(self.devices)
+                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+                    label = self.train_label[dec_token.view(-1)].to(self.devices)
                     area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
 
                     ind = torch.arange(10)
@@ -188,14 +194,21 @@ class LocGPT_Runner():
                     dec_token = dec_token*10 + ind
                     enc_token = enc_token.to(self.devices, dtype=torch.int32)
                     dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
+                    B, n_seq = enc_token.shape
+
                     dec_input = area_tagpos[:, 0:-1, 1:4]  # [B, n_seq-1, 3]
-                    start_placeholder = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
-                    dec_input = torch.concat((start_placeholder, dec_input), dim=1)  # [B, n_seq, 3]
+                    start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
+                    dec_input = torch.concat((start_token, dec_input), dim=1)  # [B, n_seq, 3]
+
+                    mask = torch.randint(0, 2, (B, n_seq)).eq(1).to(self.devices)   # B, seq
+                    enc_token.masked_fill_(mask, -1)
+                    dec_token.masked_fill_(mask, -1)
+
                     self.optimizer.zero_grad()
 
                     output = self.locgpt(enc_token, spt, dec_token, dec_input)  # [B, n_seq, 4]
 
-                    l1, l2, l3 = self.criterion(output, area_tagpos)
+                    l1, l2, l3 = self.criterion(output, area_tagpos, mask)
                     loss = l3
                     loss.backward()
 
@@ -244,11 +257,14 @@ class LocGPT_Runner():
 
             preds = np.zeros((B, n_seq, 4))
             with torch.no_grad():
-                for i in range(1, n_seq+1):
-                    enc_token_chunk, dec_token_chunk = enc_token[:, :i], dec_token[:, :i]
-                    spt_chunk = spt[:, 0:i, :]
+                for j in range(1, n_seq+1):
+                    enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
+                    spt_chunk = spt[:, 0:j, :]
                     output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
-                    preds[:,i-1,:] = output[:,i-1,:].cpu().detach().numpy()
+                    pos_current = output[:,j-1,:].cpu().detach()
+                    pos_label = area_tagpos[:, j-1,:]
+                    # print("position error", torch.linalg.norm(pos_current[:,1:] - pos_label[:,1:], dim=-1))
+                    preds[:,j-1,:] = pos_current
                     dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = area_tagpos
@@ -261,83 +277,21 @@ class LocGPT_Runner():
 
     def eval_network(self):
 
+
+
+        pred_all_train, gt_all_train = self.pred(self.transform_iter)
+        points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
+        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
+        print('train data Median error before transform:', np.median(pos_error_train))
+
         pred_all, gt_all = self.pred(self.test_iter)
-
-        ## Calculate distance diff errors
         points_preds, points_labels = pred_all[:, 1:], gt_all[:, 1:]
-        if points_preds.shape[0] % 2 != 0:
-            points_preds = np.delete(points_preds, -1, axis=0)
-            points_labels = np.delete(points_labels, -1, axis=0)
-        diff_features = points_labels[0::2, :] - points_labels[1::2, :]
-        diff_labels = points_preds[0::2, :] - points_preds[1::2, :]
-        diff_features_dist = np.linalg.norm(diff_features, axis=1)
-        diff_labels_dist = np.linalg.norm(diff_labels, axis=1)
-        diff_error = abs(diff_features_dist - diff_labels_dist)
-        print("Distance diff median error:", np.median(diff_error))
-
-        ## pos error
-        R, t = self.get_transform()
-
-        points_preds = points_preds @ R.T + t
         pos_error = dis2me(points_preds, points_labels)
         scio.savemat(os.path.join(self.logdir, self.expname, "pos_error.mat"),
                      {"pos_error":pos_error})
 
         print('Location Median Error', np.median(pos_error))
 
-
-
-    def get_transform(self):
-
-        # # R = 3x3 rotation matrix
-        # # t = 3 column vector
-        # # B = A@R.T + t
-        pred_all, gt_all = self.pred(self.transform_iter)
-        pred_pos, gt_pos = pred_all[:, 1:], gt_all[:, 1:]
-        pos_error = np.linalg.norm(gt_pos-pred_pos, axis=1)
-
-        print('train data Median error before transform:', np.median(pos_error))
-
-        R, t = self.learn_Rt(gt_pos, pred_pos)
-        R, t = R.detach().numpy(), t.detach().numpy()
-        # np.savetxt('gt_pre.txt', np.concatenate((gt_pos,pred_pos), axis=-1), fmt='%.3f')
-
-        pred_pos_A = pred_pos @ R.T + t
-        pos_error = np.linalg.norm(gt_pos-pred_pos_A, axis=1)
-        print('train data Median error after transform', np.median(pos_error))
-        return R, t
-
-
-    def learn_Rt(self, coords_A, coords_B):
-        """
-        coords_A: [N, 3]
-        coords_B: [N, 3]
-        """
-        # Load data
-        coords_A = torch.tensor(coords_A, dtype=torch.float32)
-        coords_B = torch.tensor(coords_B, dtype=torch.float32)
-
-        # Initialize parameters
-        R = nn.Parameter(torch.eye(3))  # Initialize rotation matrix as identity
-        t = nn.Parameter(torch.zeros(3))  # Initialize translation vector as zero
-
-        # Set up the optimizer
-        optimizer = optim.SGD([R, t], lr=0.05)
-
-        # Training loop
-        for i in range(10000):  # 1000 iterations
-            optimizer.zero_grad()  # Clear previous gradients
-
-            # Apply the transformation
-            coords_A_pred = torch.mm(coords_B, R.t()) + t
-            loss = nn.functional.mse_loss(coords_A_pred, coords_A)
-            loss.backward()
-            optimizer.step()
-
-            if i % 500 == 0:  # Print loss every 100 iterations
-                print(f"Iteration {i}: Loss = {loss.item()}")
-
-        return R, t
 
 
 
@@ -347,8 +301,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='conf/s02-transformer.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=1)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 

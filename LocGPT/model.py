@@ -180,7 +180,7 @@ def get_padding_mask(seq_q, seq_k):
     batch, len_q = seq_q.size()
     batch, len_k = seq_k.size()
     # we define index of PAD is 0, if tensor equals (zero) PAD tokens
-    pad_attn_mask = seq_k.data.eq(0).unsqueeze(1) # [batch, 1, len_k]
+    pad_attn_mask = seq_k.data.eq(-1).unsqueeze(1) # [batch, 1, len_k]
 
     return pad_attn_mask.expand(batch, len_q, len_k) # [batch, len_q, len_k]
 
