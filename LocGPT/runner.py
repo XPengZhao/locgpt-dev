@@ -28,20 +28,16 @@ dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
 class MyDataset(Dataset):
     def __init__(self, data_dir):
 
-        df = pd.read_csv(data_dir+'.csv')
-        self.spt = torch.load(data_dir+'.t')  #[datalen, 3, spt_dim]
-        self.enc_token = torch.arange(len(self.spt)).unsqueeze(1) #[datalen, 1]
-        self.dec_token = torch.arange(len(self.spt)).unsqueeze(1) #[datalen, 1]
+        self.data = torch.load(data_dir)  #[datalen, n_seq, timestamp+area+pos+spt]
+        self.enc_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
+        self.dec_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
 
-        area = np.zeros((len(df), 1))
-        tag = df.iloc[:, 9:12].values
-        gateway = df.iloc[:, 0:9].values
-        self.labels = np.concatenate((area, tag, gateway), axis=-1)  # (datalen, 4+9)
-        self.labels = torch.tensor(self.labels, dtype=torch.float32)
+        self.labels = self.data[..., :5]  # [datalen, n_seq, timestamp+area+pos]
+        self.spt = self.data[..., 5:]
+
 
     def loaddata(self):
         return self.enc_token, self.spt, self.dec_token, self.labels
-
 
 
 
@@ -49,6 +45,7 @@ class LocGPT_Runner():
     def __init__(self, mode, **kwargs) -> None:
 
         kwargs_path = kwargs['path']
+        kwargs_dataset = kwargs['dataset']
         kwargs_network = kwargs['networks']
         kwargs_train = kwargs['training']
 
@@ -59,8 +56,11 @@ class LocGPT_Runner():
         self.load_ckpt = kwargs_path['load_ckpt']
         self.train_file = kwargs_path['train_file']
         self.test_file = kwargs_path['test_file']
-
         self.devices = torch.device('cuda')
+
+        # Dataset
+        self.gateways_pos = kwargs_dataset['gateways_pos']
+        self.n_seq = kwargs_dataset['n_seq']
 
         ## Network
         self.locgpt = LocGPT(**kwargs_network["transformer"]).to(self.devices)
@@ -151,23 +151,41 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    def criterion(self, x, y):
-        def loss_l2(preds, labels):
-            l_ = preds.shape[0]
-            w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
-            diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
-            diff_preds = torch.norm(diff_preds, dim=1)
-            diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
-            diff_labels = torch.norm(diff_labels, dim=1)
+    # def criterion(self, x, y):
+    #     def loss_l2(preds, labels):
+    #         l_ = preds.shape[0]
+    #         w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
+    #         diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
+    #         diff_preds = torch.norm(diff_preds, dim=1)
+    #         diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
+    #         diff_labels = torch.norm(diff_labels, dim=1)
 
-            return dis2mse(diff_preds, diff_labels), torch.unique(w, return_counts=True)[1].reshape(-1, 1)
+    #         return dis2mse(diff_preds, diff_labels), torch.unique(w, return_counts=True)[1].reshape(-1, 1)
+
+    #     mse = nn.MSELoss()
+    #     l1 = mse(x[:, 0], y[:, 0])
+    #     l2, _ = loss_l2(x, y)
+    #     l3 = self.beta * l1 + (1-self.beta) * l2
+
+    #     return l1, l2, l3
+
+
+    def criterion(self, x, y):
+        """
+        Parameters
+        --------------
+        x: [B, n_seq, 4]. area+pos
+        """
 
         mse = nn.MSELoss()
-        l1 = mse(x[:, 0], y[:, 0])
-        l2, _ = loss_l2(x, y)
+        l1 = mse(x[..., 0], y[..., 0])
+        l2 = mse(x[..., 1:], y[..., 1:])
         l3 = self.beta * l1 + (1-self.beta) * l2
 
         return l1, l2, l3
+
+
+
 
 
     def train_network(self):
@@ -180,18 +198,24 @@ class LocGPT_Runner():
         for epoch in range(self.epoch_start, self.total_epoches):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
+                    B, n_seq = enc_token.shape
+                    spt = self.train_spt[enc_token.squeeze()].to(self.devices)   # [B, n_seq, 3*9*36]
+                    label = self.train_label[dec_token.squeeze()].to(self.devices)
+                    area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
 
-                    spt = self.train_spt[enc_token].to(self.devices)
-                    label = self.train_label[dec_token].to(self.devices)
-                    area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
+                    ind = torch.arange(10)
+                    enc_token = enc_token*10 + ind
+                    dec_token = dec_token*10 + ind
                     enc_token = enc_token.to(self.devices, dtype=torch.int32)
                     dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
-                    dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
-
+                    dec_input = area_tagpos[:, 0:-1, 1:4]  # [B, n_seq-1, 3]
+                    start_placeholder = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
+                    dec_input = torch.concat((start_placeholder, dec_input), dim=1)  # [B, n_seq, 3]
                     self.optimizer.zero_grad()
-                    # output = self.locgpt(enc_token, spt, dec_token, area_tagpos[...,1:4], gateway_pos)
-                    output = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos)
-                    l1, l2, l3 = self.criterion(output.squeeze(), area_tagpos.squeeze())
+
+                    output = self.locgpt(enc_token, spt, dec_token, dec_input)  # [B, n_seq, 4]
+
+                    l1, l2, l3 = self.criterion(output, area_tagpos)
                     loss = l3
                     loss.backward()
 
@@ -234,7 +258,7 @@ class LocGPT_Runner():
 
 
             with torch.no_grad():
-                preds = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos).squeeze()
+                preds = self.locgpt(enc_token, spt, dec_token, dec_input).squeeze()
                 preds = preds.cpu().detach().numpy()  # [B, 4]
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = test_labels
@@ -331,8 +355,8 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/s02-enc-dec.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--config', type=str, default='conf/s02-transformer.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=1)
     parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)

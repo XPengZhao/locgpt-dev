@@ -343,7 +343,7 @@ class Decoder(nn.Module):
     attn1_mask = torch.gt(attn1_padding_mask + attn1_lookahead_mask, 0)
 
     attn2_padding_mask = get_padding_mask(dec_token, enc_token) # [batch, target_len, source_len]
-    attn2_lookself_mask = get_lookself_mask(dec_token)
+    attn2_lookself_mask = get_lookself_mask(dec_token).cuda()
     attn2_mask = torch.gt(attn2_padding_mask + attn2_lookself_mask, 0)
 
     dec_input = self.pe(dec_input)
@@ -368,20 +368,20 @@ class LocGPT(nn.Module):
         self.pe, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
 
 
-    def forward(self, enc_token, enc_input, dec_token, dec_input, gateway_pos):
+    def forward(self, enc_token, enc_input, dec_token, dec_input):
         """
         Params
         --------------
         enc_token: tensor, [B, n_seq]. The index of spectrum as the input of encoder
-        enc_input: tensor, [B, n_seq, n_gateway, spt_dim]
+        enc_input: tensor, [B, n_seq, spt_dim x 3]
         dec_token: [B, n_seq]
         dec_input: [B, n_seq, 3]
         """
         B, n_seq = enc_token.shape
-
-        omega1, enc_output1 = self.encoder1(enc_input[..., 0, :])
-        omega2, enc_output2 = self.encoder2(enc_input[..., 1, :])
-        omega3, enc_output3 = self.encoder3(enc_input[..., 2, :])
+        spt_dim = 9*36
+        omega1, enc_output1 = self.encoder1(enc_token, enc_input[..., 0:spt_dim])
+        omega2, enc_output2 = self.encoder2(enc_token, enc_input[..., spt_dim:2*spt_dim])
+        omega3, enc_output3 = self.encoder3(enc_token, enc_input[..., 2*spt_dim : 3*spt_dim])
 
         enc_output = enc_output1 + enc_output2 + enc_output3
 
