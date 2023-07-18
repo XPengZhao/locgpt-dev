@@ -290,10 +290,11 @@ class Decoder(nn.Module):
     decoder_output = self.positional_embedding(decoder_output.transpose(0, 1)).transpose(0, 1) # [batch, target_len, d_model]
     decoder_self_attn_mask = get_attn_pad_mask(decoder_input, decoder_input) # [batch, target_len, target_len]
     decoder_subsequent_mask = get_attn_subsequent_mask(decoder_input).cuda() # [batch, target_len, target_len]
-
+    decoder_self_mask = torch.gt(decoder_self_attn_mask + decoder_subsequent_mask, 0)
+    
     decoder_encoder_attn_mask = get_attn_pad_mask(decoder_input, encoder_input) # [batch, target_len, source_len]
 
-    decoder_self_mask = torch.gt(decoder_self_attn_mask + decoder_subsequent_mask, 0)
+
     decoder_self_attns, decoder_encoder_attns = [], []
 
     for layer in self.layers:

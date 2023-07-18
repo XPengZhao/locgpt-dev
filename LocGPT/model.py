@@ -10,6 +10,61 @@ import numpy as np
 from loc_comdel import area
 
 
+
+class ViT(nn.Module):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool='cls', channels=3, dim_head=64, dropout=0., emb_dropout=0.):
+        super().__init__()
+
+        def pair(t):
+            return t if isinstance(t, tuple) else (t, t)
+
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
+
+        assert  image_height % patch_height ==0 and image_width % patch_width == 0
+
+        num_patches = (image_height // patch_height) * (image_width // patch_width)
+        patch_dim = channels * patch_height * patch_width
+        assert pool in {'cls', 'mean'}
+
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
+            nn.Linear(patch_dim, dim)
+        )
+
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches+1, dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))					# nn.Parameter()定义可学习参数
+        self.dropout = nn.Dropout(emb_dropout)
+
+        self.encoder = Encoder(dim, depth, heads, dim_head, mlp_dim, dropout)
+
+        self.pool = pool
+        self.to_latent = nn.Identity()
+
+        self.mlp_head = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, num_classes)
+        )
+
+    def forward(self, img):
+        x = self.to_patch_embedding(img)        # b c (h p1) (w p2) -> b (h w) (p1 p2 c) -> b (h w) dim
+        b, n, _ = x.shape           # b表示batchSize, n表示每个块的空间分辨率, _表示一个块内有多少个值
+
+        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)  # self.cls_token: (1, 1, dim) -> cls_tokens: (batchSize, 1, dim)
+        x = torch.cat((cls_tokens, x), dim=1)               # 将cls_token拼接到patch token中去       (b, 65, dim)
+        x += self.pos_embedding[:, :(n+1)]                  # 加位置嵌入（直接加）      (b, 65, dim)
+        x = self.dropout(x)
+
+        x = self.encoder(x)                                                 # (b, 65, dim)
+        feature = x
+        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]                   # (b, dim)
+
+        x = self.to_latent(x)                                                   # Identity (b, dim)
+
+        return self.mlp_head(x), feature                                        #  (b, num_classes)
+
+
+
 class Embedder():
     """positional encoding
     """
@@ -109,9 +164,9 @@ class PositionalEncoding(nn.Module):
 
 
 
-def get_attn_pad_mask(seq_q, seq_k):
+def get_padding_mask(seq_q, seq_k):
     '''
-    Padding, because of unequal in source_len and target_len.
+    Create a mask for keys that correspond to padding tokens.
 
     parameters:
     -------------
@@ -130,8 +185,7 @@ def get_attn_pad_mask(seq_q, seq_k):
     return pad_attn_mask.expand(batch, len_q, len_k) # [batch, len_q, len_k]
 
 
-
-def get_attn_subsequent_mask(seq):
+def get_lookahead_mask(seq):
     '''
     Build attention mask matrix for decoder when it autoregressing.
 
@@ -139,13 +193,31 @@ def get_attn_subsequent_mask(seq):
     seq: [batch, target_len]
 
     return:
-    subsequent_mask: [batch, target_len, target_len]
+    lookahead_mask: [batch, target_len, target_len]
     '''
     attn_shape = [seq.size(0), seq.size(1), seq.size(1)] # [batch, target_len, target_len]
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1) # [batch, target_len, target_len]
-    subsequent_mask = torch.from_numpy(subsequent_mask)
+    lookahead_mask = np.triu(np.ones(attn_shape), k=1) # [batch, target_len, target_len]
+    lookahead_mask = torch.from_numpy(lookahead_mask)
 
-    return subsequent_mask # [batch, target_len, target_len]
+    return lookahead_mask
+
+
+def get_lookself_mask(seq):
+    '''
+    Build attention mask matrix for look only self
+
+    parameters:
+    seq: [batch, target_len]
+
+    return:
+    lookahead_mask: [batch, target_len, target_len]
+    '''
+    attn_shape = [seq.size(0), seq.size(1), seq.size(1)] # [batch, n_seq, n_seq]
+    eye = torch.eye(seq.size(1))
+    lookahead_mask = torch.ones(attn_shape) - eye # [batch, n_seq, n_seq]
+
+    return lookahead_mask
+
 
 
 
@@ -220,72 +292,20 @@ class Encoder(nn.Module):
         self.mlp_head = nn.Linear(dim, 2)
 
 
-    def forward(self, enc_input):
+    def forward(self, enc_token, enc_input):
         """
         Return
         ----------
         enc_input: tensor, [B, n_seq, feature_dim]
         """
+        attn_padding_mask = get_padding_mask(enc_token, enc_token) # [batch, target_len, target_len]
         for attn, ff in self.layers:
-            x = attn(enc_input, q_input=enc_input, k_input=enc_input, v_input=enc_input)
+            x = attn(enc_input, q_input=enc_input, k_input=enc_input, v_input=enc_input, attn_mask=attn_padding_mask)
             x = ff(x, inputs=x)
-
         omega = self.mlp_head(x)  # [B, n_seq, 2]
 
         return omega, x
 
-
-class ViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool='cls', channels=3, dim_head=64, dropout=0., emb_dropout=0.):
-        super().__init__()
-
-        def pair(t):
-            return t if isinstance(t, tuple) else (t, t)
-
-        image_height, image_width = pair(image_size)
-        patch_height, patch_width = pair(patch_size)
-
-        assert  image_height % patch_height ==0 and image_width % patch_width == 0
-
-        num_patches = (image_height // patch_height) * (image_width // patch_width)
-        patch_dim = channels * patch_height * patch_width
-        assert pool in {'cls', 'mean'}
-
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
-            nn.Linear(patch_dim, dim)
-        )
-
-        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches+1, dim))
-        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))					# nn.Parameter()定义可学习参数
-        self.dropout = nn.Dropout(emb_dropout)
-
-        self.encoder = Encoder(dim, depth, heads, dim_head, mlp_dim, dropout)
-
-        self.pool = pool
-        self.to_latent = nn.Identity()
-
-        self.mlp_head = nn.Sequential(
-            nn.LayerNorm(dim),
-            nn.Linear(dim, num_classes)
-        )
-
-    def forward(self, img):
-        x = self.to_patch_embedding(img)        # b c (h p1) (w p2) -> b (h w) (p1 p2 c) -> b (h w) dim
-        b, n, _ = x.shape           # b表示batchSize, n表示每个块的空间分辨率, _表示一个块内有多少个值
-
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)  # self.cls_token: (1, 1, dim) -> cls_tokens: (batchSize, 1, dim)
-        x = torch.cat((cls_tokens, x), dim=1)               # 将cls_token拼接到patch token中去       (b, 65, dim)
-        x += self.pos_embedding[:, :(n+1)]                  # 加位置嵌入（直接加）      (b, 65, dim)
-        x = self.dropout(x)
-
-        x = self.encoder(x)                                                 # (b, 65, dim)
-        feature = x
-        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]                   # (b, dim)
-
-        x = self.to_latent(x)                                                   # Identity (b, dim)
-
-        return self.mlp_head(x), feature                                        #  (b, num_classes)
 
 
 class Decoder(nn.Module):
@@ -308,33 +328,33 @@ class Decoder(nn.Module):
     '''
     Params:
     ------------------
-    decoder_input: [B, trace_len, feature_dim]
-    encoder_output: [B, phase_len, feature_dim]
-
+    enc_token: [B, n_seq]
+    dec_token: [B, n_seq]
+    encoder_output: [B, n_phase, dim_pst]
+    decoder_input: [B, n_pos, dim_pos]
 
     Returns
-    x: [B, trace_len, feature_dim]
+    x: [B, n_pos, feature_dim]
     ------------------
     '''
 
-    #  decoder_self_mask: [batch, trace_len, trace_len]
-    #  decoder_encoder_mask: [B, trace_len, phase_len]
-    dec_self_attn_mask = get_attn_pad_mask(dec_token, dec_token) # [batch, target_len, target_len]
-    dec_subsequent_mask = get_attn_subsequent_mask(dec_token).cuda() # [batch, target_len, target_len]
-    decoder_encoder_attn_mask = get_attn_pad_mask(dec_token, enc_token) # [batch, target_len, source_len]
-    decoder_self_mask = torch.gt(dec_self_attn_mask + dec_subsequent_mask, 0)
+    attn1_padding_mask = get_padding_mask(dec_token, dec_token) # [batch, target_len, target_len]
+    attn1_lookahead_mask = get_lookahead_mask(dec_token).cuda() # [batch, target_len, target_len]
+    attn1_mask = torch.gt(attn1_padding_mask + attn1_lookahead_mask, 0)
+
+    attn2_padding_mask = get_padding_mask(dec_token, enc_token) # [batch, target_len, source_len]
+    attn2_lookself_mask = get_lookself_mask(dec_token)
+    attn2_mask = torch.gt(attn2_padding_mask + attn2_lookself_mask, 0)
 
     dec_input = self.pe(dec_input)
     dec_input += self.pos_embedding                  # 加位置嵌入（直接加）      (b, 1, dim)
+
     # masked mutlihead attention
-    # in attn 1, Q, K, V all from decoder it self
-    # decoder_self_attn: [batch, n_heads, target_len, target_len]
     for attn1, attn2, ff in self.layers:
-        x = attn1(dec_input,  q_input=dec_input, k_input=dec_input, v_input=dec_input)
-        x = attn2(x,  q_input=x, k_input=enc_output, v_input=enc_output, attn_mask=decoder_encoder_attn_mask)
+        x = attn1(dec_input,  q_input=dec_input, k_input=dec_input, v_input=dec_input, attn_mask=attn1_mask)
+        x = attn2(x,  q_input=x, k_input=enc_output, v_input=enc_output, attn_mask=attn2_mask)
         x = ff(x, inputs=x)
     return x
-
 
 
 
