@@ -18,6 +18,7 @@ import yaml
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm
+from einops import rearrange
 
 from model import LocGPT
 
@@ -151,25 +152,6 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    # def criterion(self, x, y):
-    #     def loss_l2(preds, labels):
-    #         l_ = preds.shape[0]
-    #         w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
-    #         diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
-    #         diff_preds = torch.norm(diff_preds, dim=1)
-    #         diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
-    #         diff_labels = torch.norm(diff_labels, dim=1)
-
-    #         return dis2mse(diff_preds, diff_labels), torch.unique(w, return_counts=True)[1].reshape(-1, 1)
-
-    #     mse = nn.MSELoss()
-    #     l1 = mse(x[:, 0], y[:, 0])
-    #     l2, _ = loss_l2(x, y)
-    #     l3 = self.beta * l1 + (1-self.beta) * l2
-
-    #     return l1, l2, l3
-
-
     def criterion(self, x, y):
         """
         Parameters
@@ -183,8 +165,6 @@ class LocGPT_Runner():
         l3 = self.beta * l1 + (1-self.beta) * l2
 
         return l1, l2, l3
-
-
 
 
 
@@ -243,27 +223,38 @@ class LocGPT_Runner():
 
         self.locgpt.eval()
         dataset_len = len(dataset.dataset)
-        gt_all = np.zeros((dataset_len, 4))
-        pred_all = np.zeros((dataset_len, 4))
+        gt_all = np.zeros((dataset_len, self.n_seq, 4))
+        pred_all = np.zeros((dataset_len, self.n_seq, 4))
 
         for i, (enc_token, dec_token) in enumerate(dataset):
 
-            spt = self.train_spt[enc_token].to(self.devices)
-            label = self.train_label[dec_token]
-            area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
-            test_labels = area_tagpos.squeeze().numpy()
+
+            spt = self.train_spt[enc_token.squeeze()].to(self.devices)   # [B, n_seq, 3*9*36]
+            label = self.train_label[dec_token.squeeze()]
+            area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
+            ind = torch.arange(10)
+            enc_token = enc_token*10 + ind
+            dec_token = dec_token*10 + ind
             enc_token = enc_token.to(self.devices, dtype=torch.int32)
             dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
-            dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
 
+            B, n_seq = enc_token.shape
+            start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices) # [B, 1, 3]
+            dec_input_chunk = start_token
 
+            preds = np.zeros((B, n_seq, 4))
             with torch.no_grad():
-                preds = self.locgpt(enc_token, spt, dec_token, dec_input).squeeze()
-                preds = preds.cpu().detach().numpy()  # [B, 4]
+                for i in range(1, n_seq+1):
+                    enc_token_chunk, dec_token_chunk = enc_token[:, :i], dec_token[:, :i]
+                    spt_chunk = spt[:, 0:i, :]
+                    output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                    preds[:,i-1,:] = output[:,i-1,:].cpu().detach().numpy()
+                    dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
-                gt_all[i*self.batch_size:(i+1)*self.batch_size] = test_labels
+                gt_all[i*self.batch_size:(i+1)*self.batch_size] = area_tagpos
 
-
+        pred_all = rearrange(pred_all, 'b n d -> (b n) d')
+        gt_all = rearrange(gt_all, 'b n d -> (b n) d')
 
         return pred_all, gt_all
 
@@ -357,7 +348,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='conf/s02-transformer.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=1)
-    parser.add_argument('--mode', type=str, default='train')
+    parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 

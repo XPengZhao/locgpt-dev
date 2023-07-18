@@ -34,9 +34,12 @@ for i in range(0, len(data_seq)):
     heatmap = rearrange(heatmap, 'b c h w -> b (c h w)')  # [10, 3*9*36]
     data_all[i,:,5:] = heatmap
 
-train_len = int(len(data) * 0.8)
+train_len = int(len(data_all) * 0.8)
 train_data = data_all[0:train_len]
 test_data = data_all[train_len:]
+
+print("len train_data", len(train_data))
+print("len train_data", len(test_data))
 
 torch.save(train_data, "train_data-s02.t")
 torch.save(test_data, "test_data-s02.t")
