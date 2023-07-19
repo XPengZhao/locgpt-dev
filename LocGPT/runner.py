@@ -159,20 +159,32 @@ class LocGPT_Runner():
         x: [B, n_seq, 4]. area+pos
         mask: [B, n_seq]
         """
-        mask = mask.unsqueeze(-1)
-        mask = torch.logical_not(mask).float().to(self.devices)
+        # mask = mask.unsqueeze(-1)
+        # mask = torch.logical_not(mask).float().to(self.devices)
+        mask = torch.logical_not(mask)
 
         # Apply the mask to x and y
-        x = x * mask
-        y = y * mask
+        # x = x * mask
+        # y = y * mask
 
-        mse = nn.MSELoss()
-        l1 = mse(x[..., 0], y[..., 0])
-        l2 = mse(x[..., 1:], y[..., 1:])
+        l1 = x[..., 0][mask]
+        l1 = torch.mean(l1**2)
+
+        l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+        l2 = torch.mean(l2[mask] ** 2)
         l3 = self.beta * l1 + (1-self.beta) * l2
 
         return l1, l2, l3
 
+
+    def get_random_mask(self, B, n_seq):
+
+        mask = torch.zeros((B, n_seq))
+        # col = torch.randint(1,10,[1])
+        col = torch.tensor([1])
+        mask[:, col:] = 1
+        mask = mask.eq(1).to(self.devices)   # B, seq
+        return mask
 
 
     def train_network(self):
@@ -184,7 +196,7 @@ class LocGPT_Runner():
         print(total_num, num_batches)
         for epoch in range(self.epoch_start, self.total_epoches):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
-                for step, (enc_token, dec_token) in enumerate(self.train_iter):
+                for step, (enc_token, dec_token) in enumerate(self.transform_iter):
                     spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
                     label = self.train_label[dec_token.view(-1)].to(self.devices)
                     area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
@@ -200,7 +212,7 @@ class LocGPT_Runner():
                     start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
                     dec_input = torch.concat((start_token, dec_input), dim=1)  # [B, n_seq, 3]
 
-                    mask = torch.randint(0, 2, (B, n_seq)).eq(1).to(self.devices)   # B, seq
+                    mask = self.get_random_mask(B, n_seq)
                     enc_token.masked_fill_(mask, -1)
                     dec_token.masked_fill_(mask, -1)
 
@@ -224,6 +236,8 @@ class LocGPT_Runner():
 
             if self.current_epoch % self.i_save == 0:
                 self.saveckpts()
+
+
 
 
     def pred(self, dataset):
@@ -293,7 +307,57 @@ class LocGPT_Runner():
         print('Location Median Error', np.median(pos_error))
 
 
+    def get_transform(self):
 
+        # # R = 3x3 rotation matrix
+        # # t = 3 column vector
+        # # B = A@R.T + t
+        pred_all, gt_all = self.pred(self.transform_iter)
+        pred_pos, gt_pos = pred_all[:, 1:], gt_all[:, 1:]
+        pos_error = np.linalg.norm(gt_pos-pred_pos, axis=1)
+
+        print('train data Median error before transform:', np.median(pos_error))
+
+        R, t = self.learn_Rt(gt_pos, pred_pos)
+        R, t = R.detach().numpy(), t.detach().numpy()
+        # np.savetxt('gt_pre.txt', np.concatenate((gt_pos,pred_pos), axis=-1), fmt='%.3f')
+
+        pred_pos_A = pred_pos @ R.T + t
+        pos_error = np.linalg.norm(gt_pos-pred_pos_A, axis=1)
+        print('train data Median error after transform', np.median(pos_error))
+        return R, t
+
+
+    def learn_Rt(self, coords_A, coords_B):
+        """
+        coords_A: [N, 3]
+        coords_B: [N, 3]
+        """
+        # Load data
+        coords_A = torch.tensor(coords_A, dtype=torch.float32)
+        coords_B = torch.tensor(coords_B, dtype=torch.float32)
+
+        # Initialize parameters
+        R = nn.Parameter(torch.eye(3))  # Initialize rotation matrix as identity
+        t = nn.Parameter(torch.zeros(3))  # Initialize translation vector as zero
+
+        # Set up the optimizer
+        optimizer = optim.SGD([R, t], lr=0.05)
+
+        # Training loop
+        for i in range(10000):  # 1000 iterations
+            optimizer.zero_grad()  # Clear previous gradients
+
+            # Apply the transformation
+            coords_A_pred = torch.mm(coords_B, R.t()) + t
+            loss = nn.functional.mse_loss(coords_A_pred, coords_A)
+            loss.backward()
+            optimizer.step()
+
+            if i % 500 == 0:  # Print loss every 100 iterations
+                print(f"Iteration {i}: Loss = {loss.item()}")
+
+        return R, t
 
 
 
