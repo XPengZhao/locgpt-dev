@@ -107,6 +107,8 @@ class LocGPT_Runner():
                                                       shuffle=True, drop_last=True, num_workers=0)
         self.test_iter = torch.utils.data.DataLoader(test_dataset, self.batch_size,
                                                      shuffle=False, drop_last=False, num_workers=0)
+        self.logger1.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
+                           len(self.transform_iter.dataset), len(self.train_iter.dataset), len(self.test_iter.dataset))
 
         self.logger = SummaryWriter(os.path.join(self.logdir, self.expname, 'tensorboard'))
 
@@ -302,7 +304,7 @@ class LocGPT_Runner():
 
 
 
-    def pred(self, dataset):
+    def pred(self, dataset, spt_set, label_set):
         """
         Returns
         -----------
@@ -318,8 +320,8 @@ class LocGPT_Runner():
         for i, (enc_token, dec_token) in enumerate(dataset):
 
 
-            spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
-            label = self.train_label[dec_token.view(-1)]
+            spt = spt_set[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+            label = label_set[dec_token.view(-1)]
             area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
             ind = torch.arange(10)
             enc_token = enc_token*10 + ind
@@ -352,20 +354,24 @@ class LocGPT_Runner():
 
     def eval_network(self):
 
-
-
-        pred_all_train, gt_all_train = self.pred(self.transform_iter)
+        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
         points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
         pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
-        print('train data Median error before transform:', np.median(pos_error_train))
+        self.logger1.info('train data Median error on training set:%s', np.median(pos_error_train))
+        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
+                     {"points_preds":points_preds_train,
+                      "points_labels":points_labels_train,
+                      "pos_error":pos_error_train})
 
-        pred_all, gt_all = self.pred(self.test_iter)
+        pred_all, gt_all = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds, points_labels = pred_all[:, 1:], gt_all[:, 1:]
         pos_error = dis2me(points_preds, points_labels)
-        scio.savemat(os.path.join(self.logdir, self.expname, "pos_error.mat"),
-                     {"pos_error":pos_error})
+        scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
+                     {"points_preds":points_preds,
+                      "points_labels":points_labels,
+                      "pos_error":pos_error})
 
-        print('Location Median Error', np.median(pos_error))
+        self.logger1.info('Location Median Error on testing set:%s', np.median(pos_error))
 
 
     def get_transform(self):
@@ -425,7 +431,7 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/s02-transformer.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/s02-seq-overlap.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=1)
     parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
