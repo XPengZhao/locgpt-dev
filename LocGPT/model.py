@@ -8,7 +8,9 @@ from einops.layers.torch import Rearrange
 from torch import einsum, nn
 import numpy as np
 from loc_comdel import area
+import logging
 
+logger = logging.getLogger('locgpt')
 
 
 class ViT(nn.Module):
