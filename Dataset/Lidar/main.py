@@ -35,7 +35,6 @@ class Lidar_sniffer():
 
         logger.debug("Current timestamp %s - position: x: %s, y: %s, z: %s", timestamp, position.x, position.y, position.z)
 
-        target_pos = np.array([position.x, position.y, position.z])
         # prepare the message as a JSON object
         message = json.dumps({
             'timestamp': timestamp,  # add current timestamp

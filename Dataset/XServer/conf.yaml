@@ -1,0 +1,15 @@
+## Message queue settings
+mq:
+  ip: 158.132.255.177
+  port: 5672
+  user: tagsys
+  password: "123456"
+  exchange: locgpt
+  routing_key: lidar
+  queue: lidar
+
+## ros node settings
+ros_node:
+  node_name: lio_sam_listener
+  sniff_topic: /lio_sam/mapping/odometry
+
