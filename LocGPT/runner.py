@@ -1,22 +1,25 @@
+# -*- coding: utf-8 -*-
+"""LocGPT runner
+"""
 import argparse
 import os
-
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 from shutil import copyfile
 
 import numpy as np
-import pandas as pd
 import scipy.io as scio
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 import yaml
+from einops import rearrange
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm
 
-from model import *
+from logger import logger_config
+from model import LocGPT
 
 dis2mse = lambda x, y: torch.mean((x - y) ** 2)
 dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
@@ -25,20 +28,16 @@ dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
 class MyDataset(Dataset):
     def __init__(self, data_dir):
 
-        df = pd.read_csv(data_dir+'.csv')
-        self.spt = torch.load(data_dir+'.t')  #[datalen, 3, spt_dim]
-        self.enc_token = torch.arange(len(self.spt)).unsqueeze(1) #[datalen, 1]
-        self.dec_token = torch.arange(len(self.spt)).unsqueeze(1) #[datalen, 1]
+        self.data = torch.load(data_dir)  #[datalen, n_seq, timestamp+area+pos+spt]
+        self.enc_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
+        self.dec_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
 
-        area = np.zeros((len(df), 1))
-        tag = df.iloc[:, 9:12].values
-        gateway = df.iloc[:, 0:9].values
-        self.labels = np.concatenate((area, tag, gateway), axis=-1)  # (datalen, 4+9)
-        self.labels = torch.tensor(self.labels, dtype=torch.float32)
+        self.labels = self.data[..., :5]  # [datalen, n_seq, timestamp+area+pos]
+        self.spt = self.data[..., 5:]
+
 
     def loaddata(self):
         return self.enc_token, self.spt, self.dec_token, self.labels
-
 
 
 
@@ -46,6 +45,7 @@ class LocGPT_Runner():
     def __init__(self, mode, **kwargs) -> None:
 
         kwargs_path = kwargs['path']
+        kwargs_dataset = kwargs['dataset']
         kwargs_network = kwargs['networks']
         kwargs_train = kwargs['training']
 
@@ -56,12 +56,21 @@ class LocGPT_Runner():
         self.load_ckpt = kwargs_path['load_ckpt']
         self.train_file = kwargs_path['train_file']
         self.test_file = kwargs_path['test_file']
-
         self.devices = torch.device('cuda')
-        self.phase_encoder, _ = get_embedder(multires=10, input_ch=1)  # 1 -> 1x2x10
+
+        # Dataset
+        self.gateways_pos = kwargs_dataset['gateways_pos']
+        self.n_seq = kwargs_dataset['n_seq']
+
+        #
+        log_filename = "logger.log"
+        log_savepath = os.path.join(self.logdir, self.expname, log_filename)
+        self.logger1 = logger_config(log_savepath=log_savepath, logging_name='locgpt')
+
+
 
         ## Network
-        self.locgpt = LocGPT().to(self.devices)
+        self.locgpt = LocGPT(**kwargs_network["transformer"]).to(self.devices)
         if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
@@ -98,6 +107,8 @@ class LocGPT_Runner():
                                                       shuffle=True, drop_last=True, num_workers=0)
         self.test_iter = torch.utils.data.DataLoader(test_dataset, self.batch_size,
                                                      shuffle=False, drop_last=False, num_workers=0)
+        self.logger1.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
+                           len(self.transform_iter.dataset), len(self.train_iter.dataset), len(self.test_iter.dataset))
 
         self.logger = SummaryWriter(os.path.join(self.logdir, self.expname, 'tensorboard'))
 
@@ -149,26 +160,41 @@ class LocGPT_Runner():
         print('Saved checkpoints at', ckptname)
 
 
-    def criterion(self, x, y):
-        def loss_l2(preds, labels):
-            l_ = preds.shape[0]
-            w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
-            diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
-            diff_preds = torch.norm(diff_preds, dim=1)
-            diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
-            diff_labels = torch.norm(diff_labels, dim=1)
+    def criterion(self, x, y, mask):
+        """
+        Parameters
+        --------------
+        x: [B, n_seq, 4]. area+pos
+        mask: [B, n_seq]
+        """
+        mask = torch.logical_not(mask)
 
-            return dis2mse(diff_preds, diff_labels), torch.unique(w, return_counts=True)[1].reshape(-1, 1)
+        l1 = x[..., 0][mask]
+        l1 = torch.mean(l1**2)
 
-        mse = nn.MSELoss()
-        l1 = mse(x[:, 0], y[:, 0])
-        l2, _ = loss_l2(x, y)
+        l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+        l2 = torch.mean(l2[mask] ** 2)
         l3 = self.beta * l1 + (1-self.beta) * l2
 
         return l1, l2, l3
 
 
-    def train_network(self):
+    def get_random_mask(self, B, n_seq):
+
+        num_unmasked = torch.randint(1, n_seq + 1, (B,))
+
+        # Initialize the mask with all ones
+        mask = torch.ones((B, n_seq))
+
+        # Unmask the first `n` items in each row
+        for i in range(B):
+            mask[i, :num_unmasked[i]] = 0
+
+        mask = mask.eq(1).to(self.devices)   # B, seq
+        return mask
+
+
+    def train_network_teaching_force(self):
 
         self.locgpt.train()
         total_num = len(self.train_iter.dataset)
@@ -177,19 +203,30 @@ class LocGPT_Runner():
         print(total_num, num_batches)
         for epoch in range(self.epoch_start, self.total_epoches):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
-                for step, (enc_token, dec_token) in enumerate(self.train_iter):
+                for step, (enc_token, dec_token) in enumerate(self.transform_iter):
+                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+                    label = self.train_label[dec_token.view(-1)].to(self.devices)
+                    area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
 
-                    spt = self.train_spt[enc_token].to(self.devices)
-                    label = self.train_label[dec_token].to(self.devices)
-                    area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
+                    ind = torch.arange(10)
+                    enc_token = enc_token*10 + ind
+                    dec_token = dec_token*10 + ind
                     enc_token = enc_token.to(self.devices, dtype=torch.int32)
                     dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
-                    dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
+                    B, n_seq = enc_token.shape
+
+                    dec_input = area_tagpos[:, 0:-1, 1:4]  # [B, n_seq-1, 3]
+                    start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
+                    dec_input = torch.concat((start_token, dec_input), dim=1)  # [B, n_seq, 3]
+
+                    mask = self.get_random_mask(B, n_seq)
+                    enc_token.masked_fill_(mask, -1)
+                    dec_token.masked_fill_(mask, -1)
 
                     self.optimizer.zero_grad()
-                    # output = self.locgpt(enc_token, spt, dec_token, area_tagpos[...,1:4], gateway_pos)
-                    output = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos)
-                    l1, l2, l3 = self.criterion(output.squeeze(), area_tagpos.squeeze())
+
+                    output = self.locgpt(enc_token, spt, dec_token, dec_input)  # [B, n_seq, 4]
+                    l1, l2, l3 = self.criterion(output, area_tagpos, mask)
                     loss = l3
                     loss.backward()
 
@@ -207,7 +244,67 @@ class LocGPT_Runner():
                 self.saveckpts()
 
 
-    def pred(self, dataset):
+
+    def train_network(self):
+        """auto regressing mode
+        """
+
+        self.locgpt.train()
+        total_num = len(self.train_iter.dataset)
+        num_batches = len(self.train_iter)
+        log_step_interval = 1
+        print(total_num, num_batches)
+        for epoch in range(self.epoch_start, self.total_epoches):
+            with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
+                for step, (enc_token, dec_token) in enumerate(self.train_iter):
+                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+                    label = self.train_label[dec_token.view(-1)].to(self.devices)
+                    area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
+
+                    ind = torch.arange(10)
+                    enc_token = enc_token*10 + ind
+                    dec_token = dec_token*10 + ind
+                    enc_token = enc_token.to(self.devices, dtype=torch.int32)
+                    dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
+                    B, n_seq = enc_token.shape
+
+                    start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices) # [B, 1, 3]
+                    dec_input_chunk = start_token
+
+                    mask = self.get_random_mask(B, n_seq)
+                    enc_token.masked_fill_(mask, -1)
+                    dec_token.masked_fill_(mask, -1)
+
+                    # Initialize a tensor to store the outputs
+                    outputs = torch.zeros_like(area_tagpos)
+                    self.optimizer.zero_grad()
+                    for j in range(1, n_seq+1):
+                        enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
+                        spt_chunk = spt[:, 0:j, :]
+                        output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                        dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
+                        outputs[:, j-1:j, :] = output[:,-1:,:]
+
+                    l1, l2, l3 = self.criterion(output, area_tagpos, mask)
+                    loss = l3
+                    loss.backward()
+                    self.optimizer.step()
+                    global_iter_num = epoch * num_batches + step + 1
+                    pbar.update(1)
+                    pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
+                    if global_iter_num % log_step_interval == 0:
+                        self.logger.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
+                        self.logger.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
+            self.cosine_schedule.step()
+            self.current_epoch = epoch
+
+            if self.current_epoch % self.i_save == 0:
+                self.saveckpts()
+
+
+
+
+    def pred(self, dataset, spt_set, label_set):
         """
         Returns
         -----------
@@ -217,57 +314,64 @@ class LocGPT_Runner():
 
         self.locgpt.eval()
         dataset_len = len(dataset.dataset)
-        gt_all = np.zeros((dataset_len, 4))
-        pred_all = np.zeros((dataset_len, 4))
+        gt_all = np.zeros((dataset_len, self.n_seq, 4))
+        pred_all = np.zeros((dataset_len, self.n_seq, 4))
 
         for i, (enc_token, dec_token) in enumerate(dataset):
 
-            spt = self.train_spt[enc_token].to(self.devices)
-            label = self.train_label[dec_token]
-            area_tagpos, gateway_pos = label[..., :4], label[..., 4:]
-            test_labels = area_tagpos.squeeze().numpy()
+
+            spt = spt_set[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+            label = label_set[dec_token.view(-1)]
+            area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
+            ind = torch.arange(10)
+            enc_token = enc_token*10 + ind
+            dec_token = dec_token*10 + ind
             enc_token = enc_token.to(self.devices, dtype=torch.int32)
             dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
-            dec_input = torch.ones((len(dec_token), 1, 3), dtype=torch.float32).to(self.devices)
 
+            B, n_seq = enc_token.shape
+            start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices) # [B, 1, 3]
+            dec_input_chunk = start_token
 
+            preds = np.zeros((B, n_seq, 4))
             with torch.no_grad():
-                preds = self.locgpt(enc_token, spt, dec_token, dec_input, gateway_pos).squeeze()
-                preds = preds.cpu().detach().numpy()  # [B, 4]
+                for j in range(1, n_seq+1):
+                    enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
+                    spt_chunk = spt[:, 0:j, :]
+                    output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                    pos_current = output[:,j-1,:].cpu().detach()
+                    pos_label = area_tagpos[:, j-1,:]
+                    preds[:,j-1,:] = pos_current
+                    dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
-                gt_all[i*self.batch_size:(i+1)*self.batch_size] = test_labels
+                gt_all[i*self.batch_size:(i+1)*self.batch_size] = area_tagpos
 
-
+        pred_all = rearrange(pred_all, 'b n d -> (b n) d')
+        gt_all = rearrange(gt_all, 'b n d -> (b n) d')
 
         return pred_all, gt_all
 
 
     def eval_network(self):
 
-        pred_all, gt_all = self.pred(self.test_iter)
+        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
+        points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
+        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
+        self.logger1.info('train data Median error on training set:%s', np.median(pos_error_train))
+        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
+                     {"points_preds":points_preds_train,
+                      "points_labels":points_labels_train,
+                      "pos_error":pos_error_train})
 
-        ## Calculate distance diff errors
+        pred_all, gt_all = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds, points_labels = pred_all[:, 1:], gt_all[:, 1:]
-        if points_preds.shape[0] % 2 != 0:
-            points_preds = np.delete(points_preds, -1, axis=0)
-            points_labels = np.delete(points_labels, -1, axis=0)
-        diff_features = points_labels[0::2, :] - points_labels[1::2, :]
-        diff_labels = points_preds[0::2, :] - points_preds[1::2, :]
-        diff_features_dist = np.linalg.norm(diff_features, axis=1)
-        diff_labels_dist = np.linalg.norm(diff_labels, axis=1)
-        diff_error = abs(diff_features_dist - diff_labels_dist)
-        print("Distance diff median error:", np.median(diff_error))
-
-        ## pos error
-        R, t = self.get_transform()
-
-        points_preds = points_preds @ R.T + t
         pos_error = dis2me(points_preds, points_labels)
-        scio.savemat(os.path.join(self.logdir, self.expname, "pos_error.mat"),
-                     {"pos_error":pos_error})
+        scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
+                     {"points_preds":points_preds,
+                      "points_labels":points_labels,
+                      "pos_error":pos_error})
 
-        print('Location Median Error', np.median(pos_error))
-
+        self.logger1.info('Location Median Error on testing set:%s', np.median(pos_error))
 
 
     def get_transform(self):
@@ -324,14 +428,12 @@ class LocGPT_Runner():
 
 
 
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/s02-enc-dec.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/s02-seq-overlap.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=1)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 

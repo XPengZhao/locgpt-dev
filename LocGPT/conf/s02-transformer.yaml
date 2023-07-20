@@ -1,12 +1,18 @@
 ## Path settings
 path:
-  expname: exp3-s02
-  datadir: data/mcbench/
+  expname: exp6-s02        ## exp6 Add col padding mask
+  datadir: data/transformer-test/
   logdir: logs/mcbench/
-  train_file: train_data-s02
-  test_file: test_data-s02
+  train_file: train_data-s02.t
+  test_file: test_data-s02.t
   load_ckpt: True
 
+
+
+## Dataset settings
+dataset:
+  gateways_pos: [[2.41,9.68,0.70],[-2.25,9.74,0],[3.89,-9.18,0.69]]
+  n_seq: 10
 
 ## Network settings
 networks:
@@ -17,7 +23,7 @@ networks:
     heads: 8
     dim_head: 64
     mlp_dim: 1024
-    dropout: 0.1
+    dropout: 0
 
 
 
@@ -25,7 +31,7 @@ networks:
 training:
   lr: 1e-4
   weight_decay: 1e-4
-  batch_size: 128
-  total_epoches: 18000
+  batch_size: 64
+  total_epoches: 10000
   i_save: 1    # model save epoch
   beta: 0.01   # loss weight
