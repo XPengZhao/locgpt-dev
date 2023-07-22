@@ -1,0 +1,194 @@
+2023-07-20 17:29:22,975 - server - INFO - Create collection test1
+2023-07-20 17:30:02,172 - server - INFO - Create collection test1
+2023-07-20 17:30:19,409 - server - INFO - Create collection test1
+2023-07-20 17:31:08,266 - server - INFO - Create collection test1
+2023-07-20 17:34:23,754 - server - INFO - Create collection test1
+2023-07-20 17:35:22,362 - server - INFO - Create collection test1
+2023-07-20 17:35:40,553 - server - INFO - Create collection test1
+2023-07-20 17:36:09,601 - server - INFO - Create collection test1
+2023-07-20 17:38:22,088 - server - INFO - Create collection test1
+2023-07-20 17:38:56,875 - server - INFO - Create collection test1
+2023-07-20 17:38:56,953 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:40:13,100 - server - INFO - Create collection test1
+2023-07-20 17:40:13,182 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:45:49,650 - server - INFO - Create collection test1
+2023-07-20 17:45:49,729 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:45:49,729 - server - INFO - Start listening gateway1_tag2
+2023-07-20 17:45:49,729 - server - INFO - Start listening gateway2_tag1
+2023-07-20 17:45:49,729 - server - INFO - Start listening gateway2_tag2
+2023-07-20 17:45:49,730 - server - INFO - Start listening gateway3_tag1
+2023-07-20 17:45:49,730 - server - INFO - Start listening gateway3_tag2
+2023-07-20 17:45:49,730 - server - INFO - Start listening gateway4_tag1
+2023-07-20 17:45:49,731 - server - INFO - Start listening gateway4_tag2
+2023-07-20 17:45:49,731 - server - INFO - Start listening lidar
+2023-07-20 17:46:36,539 - server - INFO - Create collection test1
+2023-07-20 17:46:36,622 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:46:36,622 - server - INFO - Start listening gateway1_tag2
+2023-07-20 17:46:36,622 - server - INFO - Start listening gateway2_tag1
+2023-07-20 17:46:36,622 - server - INFO - Start listening gateway2_tag2
+2023-07-20 17:46:36,623 - server - INFO - Start listening gateway3_tag1
+2023-07-20 17:46:36,623 - server - INFO - Start listening gateway3_tag2
+2023-07-20 17:46:36,623 - server - INFO - Start listening gateway4_tag1
+2023-07-20 17:46:36,623 - server - INFO - Start listening gateway4_tag2
+2023-07-20 17:46:36,623 - server - INFO - Start listening lidar
+2023-07-20 17:52:12,649 - server - INFO - Create collection test1
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway1_tag2
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway2_tag1
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway2_tag2
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway3_tag1
+2023-07-20 17:52:12,765 - server - INFO - Start listening gateway3_tag2
+2023-07-20 17:52:12,766 - server - INFO - Start listening gateway4_tag1
+2023-07-20 17:52:12,766 - server - INFO - Start listening gateway4_tag2
+2023-07-20 17:52:12,766 - server - INFO - Start listening lidar
+2023-07-20 17:52:25,053 - server - INFO - Create collection test1
+2023-07-20 17:52:25,132 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:52:25,132 - server - INFO - Start listening gateway1_tag2
+2023-07-20 17:52:25,132 - server - INFO - Start listening gateway2_tag1
+2023-07-20 17:52:25,132 - server - INFO - Start listening gateway2_tag2
+2023-07-20 17:52:25,132 - server - INFO - Start listening gateway3_tag1
+2023-07-20 17:52:25,133 - server - INFO - Start listening gateway3_tag2
+2023-07-20 17:52:25,133 - server - INFO - Start listening gateway4_tag1
+2023-07-20 17:52:25,133 - server - INFO - Start listening gateway4_tag2
+2023-07-20 17:52:25,133 - server - INFO - Start listening lidar
+2023-07-20 17:52:37,165 - server - INFO - Create collection test1
+2023-07-20 17:52:37,242 - server - INFO - Start listening gateway1_tag1
+2023-07-20 17:52:37,242 - server - INFO - Start listening gateway1_tag2
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway2_tag1
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway2_tag2
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway3_tag1
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway3_tag2
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway4_tag1
+2023-07-20 17:52:37,243 - server - INFO - Start listening gateway4_tag2
+2023-07-20 17:52:37,244 - server - INFO - Start listening lidar
+2023-07-20 21:05:57,120 - server - INFO - Create collection test1
+2023-07-20 21:05:57,772 - server - INFO - Start listening gateway1_tag1
+2023-07-20 21:05:57,772 - server - INFO - Start listening gateway1_tag2
+2023-07-20 21:05:57,772 - server - INFO - Start listening gateway2_tag1
+2023-07-20 21:05:57,773 - server - INFO - Start listening gateway2_tag2
+2023-07-20 21:05:57,773 - server - INFO - Start listening gateway3_tag1
+2023-07-20 21:05:57,775 - server - INFO - Start listening gateway3_tag2
+2023-07-20 21:05:57,776 - server - INFO - Start listening gateway4_tag1
+2023-07-20 21:05:57,776 - server - INFO - Start listening gateway4_tag2
+2023-07-20 21:05:57,777 - server - INFO - Start listening lidar
+2023-07-20 21:07:35,212 - server - INFO - Create collection test1
+2023-07-20 21:07:36,002 - server - INFO - Start listening gateway1_tag1
+2023-07-20 21:07:36,002 - server - INFO - Start listening gateway1_tag2
+2023-07-20 21:07:36,002 - server - INFO - Start listening gateway2_tag1
+2023-07-20 21:07:36,002 - server - INFO - Start listening gateway2_tag2
+2023-07-20 21:07:36,003 - server - INFO - Start listening gateway3_tag1
+2023-07-20 21:07:36,003 - server - INFO - Start listening gateway3_tag2
+2023-07-20 21:07:36,003 - server - INFO - Start listening gateway4_tag1
+2023-07-20 21:07:36,003 - server - INFO - Start listening gateway4_tag2
+2023-07-20 21:07:36,004 - server - INFO - Start listening lidar
+2023-07-20 21:08:27,345 - server - INFO - Create collection test1
+2023-07-20 21:08:28,293 - server - INFO - Start listening gateway1_tag1
+2023-07-20 21:08:28,293 - server - INFO - Start listening gateway1_tag2
+2023-07-20 21:08:28,294 - server - INFO - Start listening gateway2_tag1
+2023-07-20 21:08:28,294 - server - INFO - Start listening gateway2_tag2
+2023-07-20 21:08:28,294 - server - INFO - Start listening gateway3_tag1
+2023-07-20 21:08:28,295 - server - INFO - Start listening gateway3_tag2
+2023-07-20 21:08:28,297 - server - INFO - Start listening gateway4_tag1
+2023-07-20 21:08:28,297 - server - INFO - Start listening gateway4_tag2
+2023-07-20 21:08:28,298 - server - INFO - Start listening lidar
+2023-07-20 21:10:43,900 - server - INFO - Create collection test1
+2023-07-20 21:10:44,462 - server - INFO - Start listening gateway1_tag1
+2023-07-20 21:10:44,462 - server - INFO - Start listening gateway1_tag2
+2023-07-20 21:10:44,463 - server - INFO - Start listening gateway2_tag1
+2023-07-20 21:10:44,463 - server - INFO - Start listening gateway2_tag2
+2023-07-20 21:10:44,464 - server - INFO - Start listening gateway3_tag1
+2023-07-20 21:10:44,464 - server - INFO - Start listening gateway3_tag2
+2023-07-20 21:10:44,465 - server - INFO - Start listening gateway4_tag1
+2023-07-20 21:10:44,465 - server - INFO - Start listening gateway4_tag2
+2023-07-20 21:10:44,466 - server - INFO - Start listening lidar
+2023-07-20 21:11:19,048 - server - INFO - Create collection test1
+2023-07-20 21:11:19,697 - server - INFO - Start listening gateway1_tag1
+2023-07-20 21:11:19,698 - server - INFO - Start listening gateway1_tag2
+2023-07-20 21:11:19,698 - server - INFO - Start listening gateway2_tag1
+2023-07-20 21:11:19,699 - server - INFO - Start listening gateway2_tag2
+2023-07-20 21:11:19,699 - server - INFO - Start listening gateway3_tag1
+2023-07-20 21:11:19,699 - server - INFO - Start listening gateway3_tag2
+2023-07-20 21:11:19,701 - server - INFO - Start listening gateway4_tag1
+2023-07-20 21:11:19,701 - server - INFO - Start listening gateway4_tag2
+2023-07-20 21:11:19,702 - server - INFO - Start listening lidar
+2023-07-20 21:38:47,816 - server - INFO - Create collection test1
+2023-07-20 21:38:48,632 - server - INFO - Start listening gateway1
+2023-07-20 21:38:48,632 - server - INFO - Start listening gateway2
+2023-07-20 21:38:48,632 - server - INFO - Start listening gateway3
+2023-07-20 21:38:48,633 - server - INFO - Start listening gateway4
+2023-07-20 21:38:48,633 - server - INFO - Start listening lidar
+2023-07-20 22:10:35,833 - server - INFO - Create collection test1
+2023-07-20 22:10:36,265 - server - INFO - Start listening gateway1
+2023-07-20 22:10:36,266 - server - INFO - Start listening gateway2
+2023-07-20 22:10:36,266 - server - INFO - Start listening gateway3
+2023-07-20 22:10:36,267 - server - INFO - Start listening gateway4
+2023-07-20 22:10:36,267 - server - INFO - Start listening lidar
+2023-07-20 22:11:35,549 - server - INFO - Create collection test1
+2023-07-20 22:11:35,808 - server - INFO - Start listening gateway1
+2023-07-20 22:11:35,809 - server - INFO - Start listening gateway2
+2023-07-20 22:11:35,809 - server - INFO - Start listening gateway3
+2023-07-20 22:11:35,809 - server - INFO - Start listening gateway4
+2023-07-20 22:11:35,811 - server - INFO - Start listening lidar
+2023-07-20 22:13:33,692 - server - INFO - Create collection test1
+2023-07-20 22:13:34,196 - server - INFO - Start listening gateway1
+2023-07-20 22:13:34,196 - server - INFO - Start listening gateway2
+2023-07-20 22:13:34,198 - server - INFO - Start listening gateway3
+2023-07-20 22:13:34,201 - server - INFO - Start listening gateway4
+2023-07-20 22:13:34,202 - server - INFO - Start listening lidar
+2023-07-20 22:14:30,517 - server - INFO - Create collection test1
+2023-07-20 22:14:31,211 - server - INFO - Start listening gateway1
+2023-07-20 22:14:31,211 - server - INFO - Start listening gateway2
+2023-07-20 22:14:31,212 - server - INFO - Start listening gateway3
+2023-07-20 22:14:31,214 - server - INFO - Start listening gateway4
+2023-07-20 22:14:31,215 - server - INFO - Start listening lidar
+2023-07-20 22:16:26,260 - server - INFO - Create collection test2
+2023-07-20 22:16:27,085 - server - INFO - Start listening gateway1
+2023-07-20 22:16:27,085 - server - INFO - Start listening gateway2
+2023-07-20 22:16:27,088 - server - INFO - Start listening gateway3
+2023-07-20 22:16:27,089 - server - INFO - Start listening gateway4
+2023-07-20 22:16:27,090 - server - INFO - Start listening lidar
+2023-07-20 22:27:05,919 - server - INFO - Create collection test3
+2023-07-20 22:27:06,331 - server - INFO - Start listening gateway1
+2023-07-20 22:27:06,331 - server - INFO - Start listening gateway2
+2023-07-20 22:27:06,331 - server - INFO - Start listening gateway3
+2023-07-20 22:27:06,331 - server - INFO - Start listening gateway4
+2023-07-20 22:27:06,332 - server - INFO - Start listening lidar
+2023-07-20 22:35:38,826 - server - INFO - Create collection test4
+2023-07-20 22:35:39,212 - server - INFO - Start listening gateway1
+2023-07-20 22:35:39,212 - server - INFO - Start listening gateway2
+2023-07-20 22:35:39,212 - server - INFO - Start listening gateway3
+2023-07-20 22:35:39,213 - server - INFO - Start listening gateway4
+2023-07-20 22:35:39,214 - server - INFO - Start listening lidar
+2023-07-20 22:36:43,848 - server - INFO - Create collection test4
+2023-07-20 22:36:44,149 - server - INFO - Start listening gateway5
+2023-07-20 22:36:44,150 - server - INFO - Start listening lidar
+2023-07-20 22:38:28,801 - server - INFO - Create collection test4
+2023-07-20 22:38:28,978 - server - INFO - Start listening gateway5
+2023-07-20 22:38:28,978 - server - INFO - Start listening lidar
+2023-07-20 22:48:57,788 - server - INFO - Create collection pq504_exp1
+2023-07-20 22:48:58,147 - server - INFO - Start listening gateway1
+2023-07-20 22:48:58,147 - server - INFO - Start listening gateway2
+2023-07-20 22:48:58,148 - server - INFO - Start listening gateway3
+2023-07-20 22:48:58,148 - server - INFO - Start listening gateway4
+2023-07-20 22:48:58,149 - server - INFO - Start listening lidar
+2023-07-22 14:47:41,724 - server - INFO - Reading for collection pq504_exp1 with 37955 records
+2023-07-22 14:50:47,414 - server - INFO - Reading for collection pq504_exp1 with 37955 records
+2023-07-22 14:50:47,415 - server - INFO - Gateway1 has 8560 records
+2023-07-22 14:54:28,679 - server - INFO - Reading for collection pq504_exp1 with 37955 records
+2023-07-22 14:54:28,727 - server - INFO - gateway1 has 8560 records
+2023-07-22 14:54:28,774 - server - INFO - gateway2 has 8534 records
+2023-07-22 14:54:28,821 - server - INFO - gateway3 has 8544 records
+2023-07-22 14:54:28,869 - server - INFO - gateway4 has 8517 records
+2023-07-22 14:54:28,915 - server - INFO - lidar has 3800 records
+2023-07-22 15:20:44,929 - server - INFO - Reading for collection pq504_exp1 with 37955 records
+2023-07-22 15:20:44,976 - server - INFO - gateway1 has 8560 records
+2023-07-22 15:20:45,023 - server - INFO - gateway2 has 8534 records
+2023-07-22 15:20:45,070 - server - INFO - gateway3 has 8544 records
+2023-07-22 15:20:45,117 - server - INFO - gateway4 has 8517 records
+2023-07-22 15:20:45,163 - server - INFO - lidar has 3800 records
+2023-07-22 15:21:07,553 - server - INFO - Reading for collection pq504_exp1 with 37955 records
+2023-07-22 15:21:07,601 - server - INFO - gateway1 has 8560 records
+2023-07-22 15:21:07,648 - server - INFO - gateway2 has 8534 records
+2023-07-22 15:21:07,695 - server - INFO - gateway3 has 8544 records
+2023-07-22 15:21:07,743 - server - INFO - gateway4 has 8517 records
+2023-07-22 15:21:07,788 - server - INFO - lidar has 3800 records

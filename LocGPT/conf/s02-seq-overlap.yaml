@@ -1,7 +1,7 @@
 ## Path settings
 path:
-  expname: exp6-s02        ## exp6 Add col padding mask
-  datadir: data/transformer-test/
+  expname: exp7-s02        ## exp6 Add col padding mask
+  datadir: data/seq-overlap/
   logdir: logs/mcbench/
   train_file: train_data-s02.t
   test_file: test_data-s02.t

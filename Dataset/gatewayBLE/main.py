@@ -13,16 +13,16 @@ broker = 'localhost'
 port = 1883
 
 # gateway 1
-topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-0C4314EF65A1"
-topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-B43A31EEB7B6"
+# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-0C4314EF65A1"
+# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-B43A31EEB7B6"
 
 # gateway 2
 # topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-0C4314EF65A1"
 # topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D0A/ble-pd-B43A31EEB7B6"
 
 # gateway 3
-# topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-0C4314EF65A1"
-# topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-B43A31EEB7B6"
+topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-0C4314EF65A1"
+topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-B43A31EEB7B6"
 
 # gateway 4
 # topic = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-0C4314EF65A1"
@@ -30,7 +30,7 @@ topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D2F/ble-pd-B43A31EEB7B6"
 
 topic_array = [(topic, 0), (topic2, 1)]
 client_id = f'python-mqtt-{random.randint(0, 100)}'
-filename = r'./data.txt' 
+filename = r'./data.txt'
 
 
 # MQTT
@@ -68,23 +68,23 @@ def subscribe(client: mqtt_client, mc):
 
     client.subscribe(topic_array)
     client.on_message = on_message
-    
+
 
 if __name__ == '__main__':
     # RabbitMQ
     PM = Paramloader()
-    mc = MQPublish(PM.ip, PM.port, PM.gateway_name)
+    mc = MQPublish(PM.ip, PM.port, "gateway3")
     try:
         mc.connect()
     except:
         print(PM.ip)
         raise Exception("can't connect to server")
-    
+
     broker = 'localhost'
     port = 1883
- 
+
     client_id = f'python-mqtt-{random.randint(0, 100)}'
-    filename = r'./data.txt' 
+    filename = r'./data.txt'
     print(client_id)
     # MQTT collect raw iq data
     client = connect_mqtt()

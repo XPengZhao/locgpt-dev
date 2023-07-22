@@ -2,7 +2,6 @@
 """global logger config
 """
 import logging
-import datetime
 
 class SpecificLogFilter(logging.Filter):
     def filter(self, record):
@@ -18,7 +17,7 @@ def logger_config(log_savepath,logging_name):
 
     # get file handler and set level
     file_handler = logging.FileHandler(log_savepath, encoding='UTF-8')
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)
 
     # Add the filter to the handler
     # log_filter = SpecificLogFilter()
@@ -32,7 +31,6 @@ def logger_config(log_savepath,logging_name):
     # console sream handler
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
-    console.setFormatter(formatter)
 
     # add handler for logger objecter
     logger.addHandler(file_handler)
@@ -40,9 +38,9 @@ def logger_config(log_savepath,logging_name):
     return logger
 
 
-# now = datetime.now()
-# log_filename = now.strftime("%Y-%m-%d_%H-%M-%S.log")
+if __name__ == '__main__':
 
-log_filename = "server.log"
-log_savepath = f'log/{log_filename}'
-logger = logger_config(log_savepath=log_savepath, logging_name='server')
+    logger = logging.getLogger('locgpt')
+    file_handlers = [handler for handler in logger.handlers if isinstance(handler, logging.FileHandler)]
+    file_handler = file_handlers[0]
+    file_handler.setLevel(logging.DEBUG)
