@@ -32,6 +32,7 @@ def logger_config(log_savepath,logging_name):
     # console sream handler
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
+    console.setFormatter(formatter)
 
     # add handler for logger objecter
     logger.addHandler(file_handler)
@@ -42,6 +43,6 @@ def logger_config(log_savepath,logging_name):
 # now = datetime.now()
 # log_filename = now.strftime("%Y-%m-%d_%H-%M-%S.log")
 
-log_filename = "lidar.log"
+log_filename = "server.log"
 log_savepath = f'log/{log_filename}'
-logger = logger_config(log_savepath=log_savepath, logging_name='lidar')
+logger = logger_config(log_savepath=log_savepath, logging_name='server')

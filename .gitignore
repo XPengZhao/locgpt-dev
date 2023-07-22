@@ -3,3 +3,6 @@ logs/
 __pycache__/
 .vscode/
 Dataset/data.txt
+obj/
+.DS_Store
+

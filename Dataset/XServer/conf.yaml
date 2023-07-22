@@ -4,12 +4,25 @@ mq:
   port: 5672
   user: tagsys
   password: "123456"
-  exchange: locgpt
-  routing_key: lidar
-  queue: lidar
+  exchange: direct_gateway
+  queue_gateway:
+    - "gateway1"
+    - "gateway2"
+    - "gateway3"
+    - "gateway4"
+  queue_lidar:
+    - "lidar"
 
-## ros node settings
-ros_node:
-  node_name: lio_sam_listener
-  sniff_topic: /lio_sam/mapping/odometry
+
+db:
+  database: "LocGPT"
+  ip: "158.132.255.110"
+  collection: "pq504_exp1"
+  devices:
+    - "gateway1"
+    - "gateway2"
+    - "gateway3"
+    - "gateway4"
+    - "lidar"
+
 

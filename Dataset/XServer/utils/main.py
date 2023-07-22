@@ -6,7 +6,7 @@ import json
 
 import numpy as np
 
-from mq.mq_mergefast import merge_data
+from utils.mq_mergefast import merge_data
 from mq.mq_publish import MQPublish, NpEncoder
 from utils.param_loader import ParamLoader as PM
 from pymongo import MongoClient
