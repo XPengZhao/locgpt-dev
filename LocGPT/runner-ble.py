@@ -254,7 +254,7 @@ class LocGPT_Runner():
         for epoch in range(self.epoch_start, self.total_epoches):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
-                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
+                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 4*9*36]
                     label = self.train_label[dec_token.view(-1)].to(self.devices)
                     area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
 
@@ -427,9 +427,9 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/ble-pq504-exp2.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='train')
+    parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 

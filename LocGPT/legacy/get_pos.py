@@ -1,8 +1,8 @@
 import scipy.io as scio
 import torch
 from einops import rearrange
-train = torch.load("train_data-s02.t")
-test = torch.load("test_data-s02.t")
+train = torch.load("data/ble-exp2/train_data-pq504.t")
+test = torch.load("data/ble-exp2/test_data-pq504.t")
 
 print(train.shape)
 pos_train = train[...,2:5]
