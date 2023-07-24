@@ -145,8 +145,6 @@ class LocGPT_Runner():
             self.epoch_start = ckpt['epoch_start']
 
 
-
-
     def saveckpts(self):
         """save checkpoints and epoch
         """
