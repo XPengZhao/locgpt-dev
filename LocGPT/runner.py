@@ -287,7 +287,8 @@ class LocGPT_Runner():
                     for j in range(1, n_seq+1):
                         enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
                         timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
-                        output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                        output = self.locgpt(timestamp_chunk, enc_token_chunk, spt_chunk,
+                                             dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
                         dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
                         outputs[:, j-1:j, :] = output[:,-1:,:]
 
@@ -327,6 +328,8 @@ class LocGPT_Runner():
 
             spt = spt_set[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
             label = label_set[dec_token.view(-1)]
+            timestamp = label[..., 0:1].to(self.devices)    # [B, n_seq, 1]
+            timestamp = timestamp - timestamp[:, 0:1, :]
             area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
             ind = torch.arange(self.n_seq)
             enc_token = enc_token*self.n_seq + ind
@@ -342,8 +345,8 @@ class LocGPT_Runner():
             with torch.no_grad():
                 for j in range(1, n_seq+1):
                     enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
-                    spt_chunk = spt[:, 0:j, :]
-                    output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                    timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
+                    output = self.locgpt(timestamp_chunk, enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
                     pos_current = output[:,j-1,:].cpu().detach()
                     pos_label = area_tagpos[:, j-1,:]
                     preds[:,j-1,:] = pos_current

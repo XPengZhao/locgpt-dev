@@ -366,16 +366,18 @@ class LocGPT(nn.Module):
         self.pos_linear = nn.Linear(kwargs['dim'], 3, bias=False)
 
         # positional embedding
+        self.pe_time_linear = nn.Linear(1, kwargs['dim'])
         self.pe_gateway_linear = nn.Linear(3, kwargs['dim'])
         self.pe_pos_linear = nn.Linear(3, kwargs['dim'])
 
         self.gateway_pos = gateway_pos  # [3, 3]
 
 
-    def forward(self, enc_token, enc_input, dec_token, dec_input):
+    def forward(self, timestamp, enc_token, enc_input, dec_token, dec_input):
         """
         Params
         --------------
+        timestamp: tensor, [B, n_seq, 1]
         enc_token: tensor, [B, n_seq]. The index of spectrum as the input of encoder
         enc_input: tensor, [B, n_seq, spt_dim x 3]
         dec_token: [B, n_seq]
@@ -383,9 +385,11 @@ class LocGPT(nn.Module):
         """
         B, n_seq = enc_token.shape
         spt_dim = 9*36
-        omega1, enc_output1 = self.encoder1(enc_token, enc_input[..., 0:spt_dim])
-        omega2, enc_output2 = self.encoder2(enc_token, enc_input[..., spt_dim:2*spt_dim])
-        omega3, enc_output3 = self.encoder3(enc_token, enc_input[..., 2*spt_dim : 3*spt_dim])
+
+        time_embedding = self.pe_time_linear(timestamp)  # [B, n_seq, 1]  -> (..., dim)
+        omega1, enc_output1 = self.encoder1(enc_token, time_embedding + enc_input[..., 0*spt_dim:1*spt_dim])
+        omega2, enc_output2 = self.encoder2(enc_token, time_embedding + enc_input[..., 1*spt_dim:2*spt_dim])
+        omega3, enc_output3 = self.encoder3(enc_token, time_embedding + enc_input[..., 2*spt_dim:3*spt_dim])
 
         ## gateway embedding
         gateway1_embedding = self.gateway_pos[0].unsqueeze(0).repeat(B, 1, 1)  # [B, 1, 3]
@@ -405,7 +409,7 @@ class LocGPT(nn.Module):
             s[:,i] = area(omega1[:,i], omega2[:,i], omega3[:,i], self.gateway_pos)
 
         #T-Network
-        dec_input = self.pe_pos_linear(dec_input)
+        dec_input = self.pe_pos_linear(dec_input) + time_embedding
         dec_output = self.decoder(enc_token, enc_output, dec_token, dec_input)
         pos = self.pos_linear(dec_output)
 
