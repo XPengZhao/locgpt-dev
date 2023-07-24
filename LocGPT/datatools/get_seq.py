@@ -51,9 +51,10 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 if __name__ == "__main__":
 
     seq_len = 1
-    data_path = "data/mcbench/data-s02.csv"
-    save_train_path = "data/mcbench/train_data-s02.t"
-    save_test_path = "data/mcbench/test_data-s02.t"
+    scene = "01"
+    data_path = f"data/mcbench/data-s{scene}.csv"
+    save_train_path = f"data/mcbench/train_data-s{scene}.t"
+    save_test_path = f"data/mcbench/test_data-s{scene}.t"
 
 
     blt = Bartlett()

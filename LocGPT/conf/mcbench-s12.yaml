@@ -1,16 +1,16 @@
 ## Path settings
 path:
-  expname: s02
+  expname: s12
   datadir: data/mcbench/
   logdir: logs/mcbench/
-  train_file: train_data-s02.t
-  test_file: test_data-s02.t
+  train_file: train_data-s12.t
+  test_file: test_data-s12.t
   load_ckpt: True
 
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[2.4133,9.6793,0.6976],[-2.2495,9.7437,0],[-2.2495,9.7437,0]]
+  gateways_pos: [[-24.9619,    1.3082,    0.4363],[10.9326,   22.4151,    1.7439],[21.1496,  -13.2157,    1.7439]]
   n_seq: 10
 
 ## Network settings

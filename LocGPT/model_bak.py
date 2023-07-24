@@ -314,9 +314,7 @@ class Decoder(nn.Module):
 
   def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
     super().__init__()
-
     self.pos_embedding = nn.Parameter(torch.randn(1, 1, dim))
-    self.pe = nn.Linear(3, dim)
 
     self.layers = nn.ModuleList([])
     for _ in range(depth):
@@ -345,11 +343,8 @@ class Decoder(nn.Module):
     attn1_mask = torch.gt(attn1_padding_mask + attn1_lookahead_mask, 0)
 
     attn2_padding_mask = get_padding_mask(dec_token, enc_token) # [batch, target_len, source_len]
-    attn2_lookself_mask = get_lookahead_mask(dec_token).cuda()
-    attn2_mask = torch.gt(attn2_padding_mask + attn2_lookself_mask, 0)
-
-    dec_input = self.pe(dec_input)
-    dec_input += self.pos_embedding                  # 加位置嵌入（直接加）      (b, 1, dim)
+    attn2_lookahead_mask = get_lookahead_mask(dec_token).cuda()
+    attn2_mask = torch.gt(attn2_padding_mask + attn2_lookahead_mask, 0)
 
     # masked mutlihead attention
     for attn1, attn2, ff in self.layers:
@@ -367,13 +362,20 @@ class LocGPT(nn.Module):
         self.encoder1, self.encoder2, self.encoder3 = [Encoder(**kwargs) for _ in range(3)]
         self.decoder = Decoder(**kwargs)
         self.pos_linear = nn.Linear(kwargs['dim'], 3, bias=False)
+
+        ## positional embedding
+        self.pe_time_linear = nn.Linear(1, kwargs['dim'])
+        self.pe_gateway_linear = nn.Linear(3, kwargs['dim'])
+        self.pe_pos_linear = nn.Linear(3, kwargs['dim'])
+
         self.gateway_pos = gateway_pos  # [3, 3]
 
 
-    def forward(self, enc_token, enc_input, dec_token, dec_input):
+    def forward(self, timestamp, enc_token, enc_input, dec_token, dec_input):
         """
         Params
         --------------
+        timestamp: tensor, [B, n_seq, 1]
         enc_token: tensor, [B, n_seq]. The index of spectrum as the input of encoder
         enc_input: tensor, [B, n_seq, spt_dim x 3]
         dec_token: [B, n_seq]
@@ -381,10 +383,23 @@ class LocGPT(nn.Module):
         """
         B, n_seq = enc_token.shape
         spt_dim = 9*36
-        omega1, enc_output1 = self.encoder1(enc_token, enc_input[..., 0:spt_dim])
-        omega2, enc_output2 = self.encoder2(enc_token, enc_input[..., spt_dim:2*spt_dim])
-        omega3, enc_output3 = self.encoder3(enc_token, enc_input[..., 2*spt_dim : 3*spt_dim])
 
+        time_embedding = self.pe_time_linear(timestamp)  # [B, n_seq, 1] -> (..., 20) -> (..., dim)
+        omega1, enc_output1 = self.encoder1(enc_token, time_embedding + enc_input[..., 0*spt_dim:1*spt_dim])
+        omega2, enc_output2 = self.encoder2(enc_token, time_embedding + enc_input[..., 1*spt_dim:2*spt_dim])
+        omega3, enc_output3 = self.encoder3(enc_token, time_embedding + enc_input[..., 2*spt_dim:3*spt_dim])
+
+        ## gateway embedding
+        gateway1_embedding = self.gateway_pos[0].unsqueeze(0).repeat(B, 1, 1)  # [B, 1, 3]
+        gateway2_embedding = self.gateway_pos[1].unsqueeze(0).repeat(B, 1, 1)
+        gateway3_embedding = self.gateway_pos[2].unsqueeze(0).repeat(B, 1, 1)
+        gateway1_embedding = self.pe_gateway_linear(gateway1_embedding)  # [B, 1, 60] -> [B, 1, dim]
+        gateway2_embedding = self.pe_gateway_linear(gateway2_embedding)
+        gateway3_embedding = self.pe_gateway_linear(gateway3_embedding)
+
+        enc_output1 = enc_output1 + gateway1_embedding
+        enc_output2 = enc_output2 + gateway2_embedding
+        enc_output3 = enc_output3 + gateway3_embedding
         enc_output = enc_output1 + enc_output2 + enc_output3
 
         s = torch.zeros((B, n_seq, 1), dtype=torch.float32).to(omega1.device)
@@ -392,6 +407,7 @@ class LocGPT(nn.Module):
             s[:,i] = area(omega1[:,i], omega2[:,i], omega3[:,i], self.gateway_pos)
 
         #T-Network
+        dec_input = self.pe_pos_linear(dec_input) + time_embedding
         dec_output = self.decoder(enc_token, enc_output, dec_token, dec_input)
         pos = self.pos_linear(dec_output)
 

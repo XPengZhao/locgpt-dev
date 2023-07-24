@@ -60,17 +60,20 @@ class LocGPT_Runner():
 
         # Dataset
         self.gateways_pos = kwargs_dataset['gateways_pos']
+        self.gateways_pos = torch.tensor(self.gateways_pos, dtype=torch.float32).to(self.devices)
         self.n_seq = kwargs_dataset['n_seq']
 
-        #
+        # Logger
         log_filename = "logger.log"
         log_savepath = os.path.join(self.logdir, self.expname, log_filename)
-        self.logger1 = logger_config(log_savepath=log_savepath, logging_name='locgpt')
-
+        self.logger = logger_config(log_savepath=log_savepath, logging_name='locgpt')
+        self.logger.info("expname:%s, datadir:%s, logdir:%s, train_file:%s, test_file:%s",
+                          self.expname, self.datadir, self.logdir, self.train_file, self.test_file)
+        self.logger_tb = SummaryWriter(os.path.join(self.logdir, self.expname, 'tensorboard'))
 
 
         ## Network
-        self.locgpt = LocGPT(**kwargs_network["transformer"]).to(self.devices)
+        self.locgpt = LocGPT(self.gateways_pos, **kwargs_network["transformer"]).to(self.devices)
         if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
@@ -107,10 +110,10 @@ class LocGPT_Runner():
                                                       shuffle=True, drop_last=True, num_workers=0)
         self.test_iter = torch.utils.data.DataLoader(test_dataset, self.batch_size,
                                                      shuffle=False, drop_last=False, num_workers=0)
-        self.logger1.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
+        self.logger.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
                            len(self.transform_iter.dataset), len(self.train_iter.dataset), len(self.test_iter.dataset))
 
-        self.logger = SummaryWriter(os.path.join(self.logdir, self.expname, 'tensorboard'))
+
 
 
     def init_weights(self, m):
@@ -180,6 +183,8 @@ class LocGPT_Runner():
 
 
     def get_random_mask(self, B, n_seq):
+        """randomly sample in one sequence
+        """
 
         num_unmasked = torch.randint(1, n_seq + 1, (B,))
         mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
@@ -232,8 +237,8 @@ class LocGPT_Runner():
                     pbar.update(1)
                     pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
                     if global_iter_num % log_step_interval == 0:
-                        self.logger.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
-                        self.logger.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
+                        self.logger_tb.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
+                        self.logger_tb.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
             self.cosine_schedule.step()
             self.current_epoch = epoch
 
@@ -290,8 +295,8 @@ class LocGPT_Runner():
                     pbar.update(1)
                     pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
                     if global_iter_num % log_step_interval == 0:
-                        self.logger.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
-                        self.logger.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
+                        self.logger_tb.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
+                        self.logger_tb.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
             self.cosine_schedule.step()
             self.current_epoch = epoch
 
@@ -353,22 +358,22 @@ class LocGPT_Runner():
         pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
         points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
         pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
-        self.logger1.info('train data Median error on training set:%s', np.median(pos_error_train))
+        self.logger.info('train data Median error on training set:%s', np.median(pos_error_train))
         scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
                      {"points_preds":points_preds_train,
                       "points_labels":points_labels_train,
                       "pos_error":pos_error_train})
 
-        pred_all, gt_all = self.pred(self.test_iter, self.test_spt, self.test_label)
-        points_preds, points_labels = pred_all[:, 1:], gt_all[:, 1:]
-        pos_error = dis2me(points_preds, points_labels)
+        pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
+        points_preds_test, points_labels_test = pred_all_test[:, 1:], gt_all_test[:, 1:]
+        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=1)
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
-                     {"points_preds":points_preds,
-                      "points_labels":points_labels,
-                      "pos_error":pos_error})
+                     {"points_preds":points_preds_test,
+                      "points_labels":points_labels_test,
+                      "pos_error":pos_error_test})
 
-        self.logger1.info('Location Median Error on testing set:%s', np.median(pos_error))
-
+        self.logger.info('Location Median Error on testing set:%s, std:%s', np.median(pos_error_test),
+                                                                            np.std(pos_error_test))
 
     def get_transform(self):
 
@@ -427,7 +432,7 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/mcbench-s01.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()

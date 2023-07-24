@@ -4,9 +4,9 @@ import torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 l = 4
 
-p1 = torch.tensor([[3.0017452239990234,3.983450412750244,0.34878233075141907]])
-p2 = torch.tensor([[-2.931766986846924,4.035231113433838,0.34878233075141907]])
-p3 = torch.tensor([[0.17407386004924774,-4.984780788421631,0.34878233075141907]])
+# p1 = torch.tensor([[3.0017452239990234,3.983450412750244,0.34878233075141907]])
+# p2 = torch.tensor([[-2.931766986846924,4.035231113433838,0.34878233075141907]])
+# p3 = torch.tensor([[0.17407386004924774,-4.984780788421631,0.34878233075141907]])
 
 def spherical2pointandline(x):
     # print(x.shape)
@@ -52,12 +52,13 @@ def distance_between_lines(p1, v1, p2, v2):
     return distance.unsqueeze(1)
 
 
-def area(x1, x2, x3):
+def area(x1, x2, x3, gateway_pos):
+    p1,p2,p3 = gateway_pos[0:1], gateway_pos[1:2], gateway_pos[2:3]
     v1 = spherical2pointandline(x1)
     v2 = spherical2pointandline(x2)
     v3 = spherical2pointandline(x3)
-    res = [intersect_or_distance(p1.to(x1.device), v1, p2.to(x2.device), v2), intersect_or_distance(p2.to(x2.device), v2, p3.to(x3.device), v3),
-           intersect_or_distance(p3.to(x3.device), v3, p1.to(x1.device), v1)]
+    res = [intersect_or_distance(p1, v1, p2, v2), intersect_or_distance(p2, v2, p3, v3),
+           intersect_or_distance(p3, v3, p1, v1)]
     zero = torch.zeros((x1.shape[0], 1))
     s = zero.to(v1.device)
     if res[0][0] + res[1][0] + res[2][0] == 6:

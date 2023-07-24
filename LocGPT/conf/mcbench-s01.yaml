@@ -1,17 +1,18 @@
 ## Path settings
 path:
-  expname: s02
+  expname: s01
   datadir: data/mcbench/
   logdir: logs/mcbench/
-  train_file: train_data-s02.t
-  test_file: test_data-s02.t
+  train_file: train_data-s01.t
+  test_file: test_data-s01.t
   load_ckpt: True
+
 
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[2.4133,9.6793,0.6976],[-2.2495,9.7437,0],[-2.2495,9.7437,0]]
-  n_seq: 10
+  gateways_pos: [[3.00,3.983,0.348],[-2.9318,4.0352,0.3488],[0.1741,-4.9848,0.3488]]
+  n_seq: 1
 
 ## Network settings
 networks:
@@ -30,7 +31,7 @@ networks:
 training:
   lr: 1e-4
   weight_decay: 1e-4
-  batch_size: 256
+  batch_size: 1024
   total_epoches: 6000
   i_save: 1    # model save epoch
   beta: 0.01   # loss weight
