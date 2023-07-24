@@ -35,3 +35,4 @@ training:
   total_epoches: 6000
   i_save: 1    # model save epoch
   beta: 0.01   # loss weight
+  T_max: 1000  # scheduler T_max

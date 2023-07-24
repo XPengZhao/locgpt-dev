@@ -80,7 +80,9 @@ class LocGPT_Runner():
         params = list(self.locgpt.parameters())
         self.optimizer = optim.Adam(params, lr=float(kwargs_train['lr']),
                                     weight_decay=float(kwargs_train['weight_decay']))
-        self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,T_max=20,eta_min=1e-5)
+        self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,
+                                                                    T_max=kwargs_train['T_max'],eta_min=1e-6,
+                                                                    last_epoch=-1)
 
 
         ## Train settings
@@ -261,6 +263,8 @@ class LocGPT_Runner():
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
                     spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
                     label = self.train_label[dec_token.view(-1)].to(self.devices)
+                    timestamp = label[..., 0:1]    # [B, n_seq, 1]
+                    timestamp = timestamp - timestamp[:, 0:1, :]  # relative timestamp to seq start
                     area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
 
                     ind = torch.arange(self.n_seq)
@@ -282,7 +286,7 @@ class LocGPT_Runner():
                     self.optimizer.zero_grad()
                     for j in range(1, n_seq+1):
                         enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
-                        spt_chunk = spt[:, 0:j, :]
+                        timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
                         output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
                         dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
                         outputs[:, j-1:j, :] = output[:,-1:,:]
