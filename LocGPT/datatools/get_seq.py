@@ -52,9 +52,9 @@ if __name__ == "__main__":
 
     seq_len = 1
     scene = "02"
-    data_path = f"data/mcbench/data-s{scene}.csv"
-    save_train_path = f"data/mcbench/train_data-s{scene}-seq{seq_len}.t"
-    save_test_path = f"data/mcbench/test_data-s{scene}-seq{seq_len}.t"
+    data_path = f"data/pretrain/data-s{scene}.csv"
+    save_train_path = f"data/pretrain/train_data-s{scene}-seq{seq_len}.t"
+    save_test_path = f"data/pretrain/test_data-s{scene}-seq{seq_len}.t"
 
 
     blt = Bartlett()
