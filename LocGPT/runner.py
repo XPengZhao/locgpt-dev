@@ -109,7 +109,7 @@ class LocGPT_Runner():
         self.transform_iter = torch.utils.data.DataLoader(train_dataset, self.batch_size,
                                                           shuffle=False, drop_last=False, num_workers=0)
         self.train_iter = torch.utils.data.DataLoader(train_dataset, self.batch_size,
-                                                      shuffle=True, drop_last=True, num_workers=0)
+                                                      shuffle=True, drop_last=False, num_workers=0)
         self.test_iter = torch.utils.data.DataLoader(test_dataset, self.batch_size,
                                                      shuffle=False, drop_last=False, num_workers=0)
         self.logger.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
@@ -184,14 +184,22 @@ class LocGPT_Runner():
 
     def get_random_mask(self, B, n_seq):
         """randomly sample in one sequence
+        Return
+        -------------
+        mask: [B, n_seq]
         """
-
-        num_unmasked = torch.randint(1, n_seq + 1, (B,))
         mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+
+        mask_start = torch.randint(0, n_seq, (B,))  # [B,]
+        mask_len = torch.randint(1, n_seq+1, (B,))
+        mask_end = torch.min(mask_start + mask_len, torch.tensor(n_seq))
+        # num_unmasked = torch.randint(1, n_seq + 1, (B,))
+
 
         # Unmask the first `n` items in each row
         for i in range(B):
-            mask[i, :num_unmasked[i]] = 0
+            mask[i, mask_start[i]:mask_end[i]] = 0
+
         mask = mask.eq(1).to(self.devices)   # B, seq
         return mask
 
@@ -256,7 +264,7 @@ class LocGPT_Runner():
         num_batches = len(self.train_iter)
         log_step_interval = 1
         print(total_num, num_batches)
-        for epoch in range(self.epoch_start, self.total_epoches):
+        for epoch in range(self.epoch_start, self.total_epoches+1):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
                     spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
@@ -287,7 +295,8 @@ class LocGPT_Runner():
                         timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
                         output = self.locgpt(timestamp_chunk, enc_token_chunk, spt_chunk,
                                              dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
-                        dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
+                        input_mask =  torch.logical_not(mask[:, j-1:j]).unsqueeze(-1)
+                        dec_input_chunk = torch.concat((dec_input_chunk, input_mask*output[:,-1:,1:]), dim=1)
                         outputs[:, j-1:j, :] = output[:,-1:,:]
 
                     l1, l2, l3 = self.criterion(output, area_tagpos, mask)
@@ -313,8 +322,8 @@ class LocGPT_Runner():
         """
         Returns
         -----------
-        pred_all: [B, 4]. predict results (s, x, y, z)
-        gt_all: [B, 4]. ground truth results (s, x, y, z)
+        pred_all: [B, n_seq, 4]. predict results (s, x, y, z)
+        gt_all: [B, n_seq, 4]. ground truth results (s, x, y, z)
         """
 
         self.locgpt.eval()
@@ -352,53 +361,82 @@ class LocGPT_Runner():
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = area_tagpos
 
-        pred_all = rearrange(pred_all, 'b n d -> (b n) d')
-        gt_all = rearrange(gt_all, 'b n d -> (b n) d')
+        # pred_all = rearrange(pred_all, 'b n d -> (b n) d')
+        # gt_all = rearrange(gt_all, 'b n d -> (b n) d')
 
         return pred_all, gt_all
 
 
     def eval_network(self):
 
-        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
-        points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
-        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
-        self.logger.info('train data Median error on training set:%s', np.median(pos_error_train))
-        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
-                     {"points_preds":points_preds_train,
-                      "points_labels":points_labels_train,
-                      "pos_error":pos_error_train})
+        R,t = self.get_transform()
 
         pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
-        points_preds_test, points_labels_test = pred_all_test[:, 1:], gt_all_test[:, 1:]
-        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=1)
+        points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
+        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
+        self.logger.info('Location Median Error on testing each trace set:%s, std:%s',
+                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
+        self.logger.info('Location Median Error on testing globally set:%s, std:%s',
+                         np.median(pos_error_test), np.std(pos_error_test))
+
+
+        # After Transform
+        points_preds_test_A = points_preds_test @ R.T + t
+        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
+        self.logger.info('After transform, Location Median Error on testing each trace set:%s, std:%s',
+                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
+        self.logger.info('After transform, Location Median Error on testing globally set:%s, std:%s',
+                         np.median(pos_error_test), np.std(pos_error_test))
+
+
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
-                     {"points_preds":points_preds_test,
+                     {"points_preds":points_preds_test_A,
                       "points_labels":points_labels_test,
                       "pos_error":pos_error_test})
 
-        self.logger.info('Location Median Error on testing set:%s, std:%s', np.median(pos_error_test),
-                                                                            np.std(pos_error_test))
+
+
+
+
 
     def get_transform(self):
 
         # # R = 3x3 rotation matrix
         # # t = 3 column vector
         # # B = A@R.T + t
-        pred_all, gt_all = self.pred(self.transform_iter)
-        pred_pos, gt_pos = pred_all[:, 1:], gt_all[:, 1:]
-        pos_error = np.linalg.norm(gt_pos-pred_pos, axis=1)
+        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
+        points_preds_train, points_labels_train = pred_all_train[..., 1:], gt_all_train[..., 1:]
+        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=-1)
+        self.logger.info('Location error on training set each trace median:%s, std:%s',
+                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+        self.logger.info('Location error on training set globally median:%s, std:%s',
+                         np.median(pos_error_train), np.std(pos_error_train))
 
-        print('train data Median error before transform:', np.median(pos_error))
+        points_preds_train = rearrange(points_preds_train, 'b n d -> (b n) d')
+        points_labels_train = rearrange(points_labels_train, 'b n d -> (b n) d')
 
-        R, t = self.learn_Rt(gt_pos, pred_pos)
+        # SVD method
+        R, t = self.learn_Rt(points_labels_train, points_preds_train)
         R, t = R.detach().numpy(), t.detach().numpy()
-        # np.savetxt('gt_pre.txt', np.concatenate((gt_pos,pred_pos), axis=-1), fmt='%.3f')
 
-        pred_pos_A = pred_pos @ R.T + t
-        pos_error = np.linalg.norm(gt_pos-pred_pos_A, axis=1)
-        print('train data Median error after transform', np.median(pos_error))
+        points_preds_train_A = points_preds_train @ R.T + t
+        points_preds_train_A = rearrange(points_preds_train_A, '(b n) d -> b n d', n=self.n_seq)
+        points_labels_train = rearrange(points_labels_train, '(b n) d -> b n d', n=self.n_seq)
+        pos_error_train = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)
+        self.logger.info('After transform, Location error on training set each trace median:%s, std:%s',
+                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+        self.logger.info('After transform, Location Error on training set globally median:%s, std:%s',
+                         np.median(pos_error_train), np.std(pos_error_train))
+
+        ## save results and loggers
+        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
+                     {"points_preds":points_preds_train,
+                      "points_labels":points_labels_train,
+                      "pos_error":pos_error_train})
+
         return R, t
+
+
 
 
     def learn_Rt(self, coords_A, coords_B):
@@ -418,7 +456,7 @@ class LocGPT_Runner():
         optimizer = optim.SGD([R, t], lr=0.05)
 
         # Training loop
-        for i in range(10000):  # 1000 iterations
+        for i in range(10001):  # 1000 iterations
             optimizer.zero_grad()  # Clear previous gradients
 
             # Apply the transformation
@@ -427,7 +465,7 @@ class LocGPT_Runner():
             loss.backward()
             optimizer.step()
 
-            if i % 500 == 0:  # Print loss every 100 iterations
+            if i % 1000 == 0:  # Print loss every 100 iterations
                 print(f"Iteration {i}: Loss = {loss.item()}")
 
         return R, t
@@ -437,9 +475,9 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s01.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='train')
+    parser.add_argument('--config', type=str, default='conf/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=2)
+    parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
