@@ -35,7 +35,6 @@ class MyDataset(Dataset):
         self.labels = self.data[..., :5]  # [datalen, n_seq, timestamp+area+pos]
         self.spt = self.data[..., 5:]
 
-
     def loaddata(self):
         return self.enc_token, self.spt, self.dec_token, self.labels
 
