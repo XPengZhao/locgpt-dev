@@ -431,9 +431,9 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/mcbench/mcbench-s02.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=2)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
