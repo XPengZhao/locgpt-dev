@@ -58,8 +58,8 @@ class LocGPT_Runner():
         self.devices = torch.device('cuda')
 
         # Dataset
-        self.gateways_pos = kwargs_dataset['gateways_pos']
-        self.gateways_pos = torch.tensor(self.gateways_pos, dtype=torch.float32).to(self.devices)
+        # self.gateways_pos = kwargs_dataset['gateways_pos']
+        # self.gateways_pos = torch.tensor(self.gateways_pos, dtype=torch.float32).to(self.devices)
         self.n_seq = kwargs_dataset['n_seq']
 
         # Logger
@@ -72,7 +72,7 @@ class LocGPT_Runner():
 
 
         ## Network
-        self.locgpt = LocGPT(self.gateways_pos, **kwargs_network["transformer"]).to(self.devices)
+        self.locgpt = LocGPT(**kwargs_network["transformer"]).to(self.devices)
         if kwargs_network['init_weight'] and mode=='train':
             self.locgpt.apply(self.init_weights)
 
@@ -474,9 +474,9 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s02.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=2)
-    parser.add_argument('--mode', type=str, default='test')
+    parser.add_argument('--config', type=str, default='conf/pretrain/pretrain-exp1.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
