@@ -11,7 +11,7 @@ np.random.seed(0)
 random.seed(0)
 
 
-def get_seq_index(num_seq, seq_len=10, max_step=3):
+def get_seq_index(num_seq, seq_len=10, max_step=5):
     """
     return
     ----------
@@ -50,12 +50,11 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 
 if __name__ == "__main__":
 
-    seq_len = 1
-    scene = "02"
+    seq_len = 10
+    scene = "37"
     data_path = f"data/mcbench/data-s{scene}.csv"
     save_train_path = f"data/mcbench/train_data-s{scene}-seq{seq_len}.t"
     save_test_path = f"data/mcbench/test_data-s{scene}-seq{seq_len}.t"
-
 
     blt = Bartlett()
     df = pd.read_csv(data_path)
@@ -93,5 +92,18 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
+    torch.save(train_data, save_train_path)
+    torch.save(test_data, save_test_path)
+
+    ## save for seq = 1
+    train_data = rearrange(train_data, 'b n d -> (b n) d').unsqueeze(1)
+    test_data = rearrange(test_data, 'b n d -> (b n) d').unsqueeze(1)
+
+
+    print("len train_data", len(train_data))
+    print("len train_data", len(test_data))
+
+    save_train_path = f"data/mcbench/train_data-s{scene}-seq1.t"
+    save_test_path = f"data/mcbench/test_data-s{scene}-seq1.t"
     torch.save(train_data, save_train_path)
     torch.save(test_data, save_test_path)
