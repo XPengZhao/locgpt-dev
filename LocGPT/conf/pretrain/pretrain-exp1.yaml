@@ -3,8 +3,8 @@ path:
   expname: pretrain-exp1
   datadir: data/pretrain/
   logdir: logs/pretrain/
-  train_file: train_data-all-exp1-seq1.t
-  test_file: test_data-all-exp1-seq1.t
+  train_file: train_data-all-exp1-seq1.pt
+  test_file: test_data-s02-seq1.t
   load_ckpt: True
 
 

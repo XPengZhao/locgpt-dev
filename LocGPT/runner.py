@@ -33,8 +33,8 @@ class MyDataset(Dataset):
         self.enc_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
         self.dec_token = torch.arange(len(self.data)).unsqueeze(1) #[datalen, 1]
 
-        self.labels = self.data[..., :5]  # [datalen, n_seq, timestamp+area+pos]
-        self.spt = self.data[..., 5:]
+        self.labels = self.data[..., :9+5]  # [datalen, n_seq, timestamp+area+pos]
+        self.spt = self.data[..., 9+5:]
 
     def loaddata(self):
         return self.enc_token, self.spt, self.dec_token, self.labels
@@ -223,9 +223,10 @@ class LocGPT_Runner():
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
                     spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
                     label = self.train_label[dec_token.view(-1)].to(self.devices)
-                    timestamp = label[..., 0:1]    # [B, n_seq, 1]
+                    gateway_pos = label[..., 0:9] # [B, n_seq, 9]
+                    timestamp = label[..., 9:10]    # [B, n_seq, 1]
                     timestamp = timestamp - timestamp[:, 0:1, :]  # relative timestamp to seq start
-                    area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
+                    area_tagpos = label[..., 10:14]    # [B, n_seq, 4]
 
                     ind = torch.arange(self.n_seq)
                     enc_token = enc_token*self.n_seq + ind
@@ -247,8 +248,9 @@ class LocGPT_Runner():
                     for j in range(1, n_seq+1):
                         enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
                         timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
-                        output = self.locgpt(timestamp_chunk, enc_token_chunk, spt_chunk,
-                                             dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                        gateway_chunk = gateway_pos[:, 0:j, :]
+                        output = self.locgpt(timestamp_chunk, gateway_chunk, enc_token_chunk,
+                                             spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
                         input_mask =  torch.logical_not(mask[:, j-1:j]).unsqueeze(-1)
                         dec_input_chunk = torch.concat((dec_input_chunk, input_mask*output[:,-1:,1:]), dim=1)
                         outputs[:, j-1:j, :] = output[:,-1:,:]

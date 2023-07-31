@@ -136,35 +136,6 @@ def get_embedder(multires, input_ch, enable=True):
     return embed, embedder_obj.out_dim
 
 
-class PositionalEncoding(nn.Module):
-
-  def __init__(self, d_model, dropout=.1, max_len=1024):
-    super(PositionalEncoding, self).__init__()
-    self.dropout = nn.Dropout(p=p_drop)
-
-    positional_encoding = torch.zeros(max_len, d_model) # [max_len, d_model]
-    position = torch.arange(0, max_len).float().unsqueeze(1) # [max_len, 1]
-
-    div_term = torch.exp(torch.arange(0, d_model, 2).float() *
-                         (-torch.log(torch.Tensor([10000])) / d_model)) # [max_len / 2]
-
-    positional_encoding[:, 0::2] = torch.sin(position * div_term) # even
-    positional_encoding[:, 1::2] = torch.cos(position * div_term) # odd
-
-    # [max_len, d_model] -> [1, max_len, d_model] -> [max_len, 1, d_model]
-    positional_encoding = positional_encoding.unsqueeze(0).transpose(0, 1)
-
-    # register pe to buffer and require no grads
-    self.register_buffer('pe', positional_encoding)
-
-  def forward(self, x):
-    # x: [seq_len, batch, d_model]
-    # we can add positional encoding to x directly, and ignore other dimension
-    x = x + self.pe[:x.size(0), ...]
-
-    return self.dropout(x)
-
-
 
 def get_padding_mask(seq_q, seq_k):
     '''
@@ -359,7 +330,7 @@ class Decoder(nn.Module):
 
 
 class LocGPT(nn.Module):
-    def __init__(self, gateway_pos, **kwargs):
+    def __init__(self, **kwargs):
         super(LocGPT, self).__init__()
         self.encoder1, self.encoder2, self.encoder3 = [Encoder(**kwargs) for _ in range(3)]
         self.decoder = Decoder(**kwargs)
@@ -370,14 +341,13 @@ class LocGPT(nn.Module):
         self.pe_gateway_linear = nn.Linear(3, kwargs['dim'])
         self.pe_pos_linear = nn.Linear(4, kwargs['dim'])
 
-        self.gateway_pos = gateway_pos  # [3, 3]
 
-
-    def forward(self, timestamp, enc_token, enc_input, dec_token, dec_input):
+    def forward(self, timestamp, gateway_pos, enc_token, enc_input, dec_token, dec_input):
         """
         Params
         --------------
         timestamp: tensor, [B, n_seq, 1]
+        gateway_pos: tensor, [B, n_seq, 9]
         enc_token: tensor, [B, n_seq]. The index of spectrum as the input of encoder
         enc_input: tensor, [B, n_seq, spt_dim x 3]
         dec_token: [B, n_seq]
@@ -392,10 +362,10 @@ class LocGPT(nn.Module):
         omega3, enc_output3 = self.encoder3(enc_token, torch.concat((timestamp, enc_input[..., 2*spt_dim:3*spt_dim]), dim=-1))
 
         ## gateway embedding
-        gateway1_embedding = self.gateway_pos[0].unsqueeze(0).repeat(B, 1, 1)  # [B, 1, 3]
-        gateway2_embedding = self.gateway_pos[1].unsqueeze(0).repeat(B, 1, 1)
-        gateway3_embedding = self.gateway_pos[2].unsqueeze(0).repeat(B, 1, 1)
-        gateway1_embedding = self.pe_gateway_linear(gateway1_embedding)  # [B, 1, 60] -> [B, 1, dim]
+        gateway1_embedding = gateway_pos[...,0:3]  # [B, 1, 3]
+        gateway2_embedding = gateway_pos[...,3:6]
+        gateway3_embedding = gateway_pos[...,6:9]
+        gateway1_embedding = self.pe_gateway_linear(gateway1_embedding)  # [B, 1, 3] -> [B, 1, dim]
         gateway2_embedding = self.pe_gateway_linear(gateway2_embedding)
         gateway3_embedding = self.pe_gateway_linear(gateway3_embedding)
 
@@ -406,7 +376,7 @@ class LocGPT(nn.Module):
 
         s = torch.zeros((B, n_seq, 1), dtype=torch.float32).to(omega1.device)
         for i in range(n_seq): # [B, n_seq, 2]
-            s[:,i] = area(omega1[:,i], omega2[:,i], omega3[:,i], self.gateway_pos)
+            s[:,i] = area(omega1[:,i], omega2[:,i], omega3[:,i], gateway_pos[:,i,:])
 
         #T-Network
         dec_input = self.pe_pos_linear(torch.concat((timestamp, dec_input), dim=-1))

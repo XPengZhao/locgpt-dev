@@ -53,7 +53,7 @@ def distance_between_lines(p1, v1, p2, v2):
 
 
 def area(x1, x2, x3, gateway_pos):
-    p1,p2,p3 = gateway_pos[0:1], gateway_pos[1:2], gateway_pos[2:3]
+    p1,p2,p3 = gateway_pos[:,0:3], gateway_pos[:,3:6], gateway_pos[:,6:9]
     v1 = spherical2pointandline(x1)
     v2 = spherical2pointandline(x2)
     v3 = spherical2pointandline(x3)
