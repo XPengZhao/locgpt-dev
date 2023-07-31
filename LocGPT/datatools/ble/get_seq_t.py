@@ -52,7 +52,7 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 
 if __name__ == "__main__":
 
-    seq_len = 1
+    seq_len = 10
     data_path = "data/ble-exp2/pq504_exp2_merge.csv"
 
     blt = Bartlett()
