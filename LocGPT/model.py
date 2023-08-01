@@ -9,6 +9,8 @@ from torch import einsum, nn
 import numpy as np
 from loc_comdel import area
 import logging
+import loralib as lora
+
 
 logger = logging.getLogger('locgpt')
 
@@ -64,7 +66,6 @@ class ViT(nn.Module):
         x = self.to_latent(x)                                                   # Identity (b, dim)
 
         return self.mlp_head(x), feature                                        #  (b, num_classes)
-
 
 
 class Embedder():
@@ -140,7 +141,7 @@ class PositionalEncoding(nn.Module):
 
   def __init__(self, d_model, dropout=.1, max_len=1024):
     super(PositionalEncoding, self).__init__()
-    self.dropout = nn.Dropout(p=p_drop)
+    self.dropout = nn.Dropout(p=dropout)
 
     positional_encoding = torch.zeros(max_len, d_model) # [max_len, d_model]
     position = torch.arange(0, max_len).float().unsqueeze(1) # [max_len, 1]
@@ -163,7 +164,6 @@ class PositionalEncoding(nn.Module):
     x = x + self.pe[:x.size(0), ...]
 
     return self.dropout(x)
-
 
 
 def get_padding_mask(seq_q, seq_k):
@@ -219,8 +219,6 @@ def get_lookself_mask(seq):
     lookahead_mask = torch.ones(attn_shape) - eye # [batch, n_seq, n_seq]
 
     return lookahead_mask
-
-
 
 
 class PostNorm(nn.Module):
@@ -309,7 +307,6 @@ class Encoder(nn.Module):
         return omega, x
 
 
-
 class Decoder(nn.Module):
 
   def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
@@ -359,8 +356,6 @@ class Decoder(nn.Module):
     return x
 
 
-
-
 class LocGPT(nn.Module):
     def __init__(self, **kwargs):
         super(LocGPT, self).__init__()
@@ -397,3 +392,17 @@ class LocGPT(nn.Module):
 
         return torch.cat((s, pos), dim=-1)
 
+
+def count_parameters(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return total_params, trainable_params
+
+
+# model = LocGPT(dim=324
+#     ,depth=2
+#     ,heads=8
+#     ,dim_head=64
+#     ,mlp_dim=1024
+#     ,dropout=0)
+# print(count_parameters(model))

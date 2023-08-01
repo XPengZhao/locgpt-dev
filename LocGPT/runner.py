@@ -3,9 +3,9 @@
 """
 import argparse
 import os
+import time
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 from shutil import copyfile
-
 import numpy as np
 import scipy.io as scio
 import torch
@@ -17,9 +17,11 @@ from einops import rearrange
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm
-
 from logger import logger_config
 from model import LocGPT
+from transformers import AutoModelForSeq2SeqLM
+from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
+
 
 dis2mse = lambda x, y: torch.mean((x - y) ** 2)
 dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
@@ -38,7 +40,6 @@ class MyDataset(Dataset):
 
     def loaddata(self):
         return self.enc_token, self.spt, self.dec_token, self.labels
-
 
 
 class LocGPT_Runner():
@@ -140,8 +141,6 @@ class LocGPT_Runner():
             self.epoch_start = ckpt['epoch_start']
 
 
-
-
     def saveckpts(self):
         """save checkpoints and epoch
         """
@@ -167,14 +166,28 @@ class LocGPT_Runner():
         x: [B, n_seq, 4]. area+pos
         mask: [B, n_seq]
         """
+        
+        
+        def loss_dist(preds, labels):
+            l_ = preds.shape[0]
+            w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
+            diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
+            diff_preds = torch.norm(diff_preds, dim=-1)
+            diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
+            diff_labels = torch.norm(diff_labels, dim=-1)
+            # return dis2mse(diff_preds, diff_labels), torch.unique(w, return_counts=True)[1].reshape(-1, 1)
+            return dis2mse(diff_preds, diff_labels)
+        
+        
         mask = torch.logical_not(mask)
 
         l1 = x[..., 0][mask]
         l1 = torch.mean(l1**2)
-
-        l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
-        l2 = torch.mean(l2[mask] ** 2)
+        # l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+        # l2 = torch.mean(l2[mask] ** 2)
+        l2 = loss_dist(x[mask], y[mask])
         l3 = self.beta * l1 + (1-self.beta) * l2
+        # l3 = l2
 
         return l1, l2, l3
 
@@ -244,7 +257,6 @@ class LocGPT_Runner():
                 self.saveckpts()
 
 
-
     def train_network(self):
         """auto regressing mode
         """
@@ -302,8 +314,6 @@ class LocGPT_Runner():
                 self.saveckpts()
 
 
-
-
     def pred(self, dataset, spt_set, label_set):
         """
         Returns
@@ -338,7 +348,11 @@ class LocGPT_Runner():
                 for j in range(1, n_seq+1):
                     enc_token_chunk, dec_token_chunk = enc_token[:, :j], dec_token[:, :j]
                     spt_chunk = spt[:, 0:j, :]
+                    bt = time.time()
                     output = self.locgpt(enc_token_chunk, spt_chunk, dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
+                    et = time.time()
+                    with open('./inference_speed_locgpt.txt', 'a') as file:
+                        file.write(f'{(et-bt)/B:.6f}\n')
                     pos_current = output[:,j-1,:].cpu().detach()
                     pos_label = area_tagpos[:, j-1,:]
                     preds[:,j-1,:] = pos_current
@@ -365,13 +379,15 @@ class LocGPT_Runner():
 
         pred_all, gt_all = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds, points_labels = pred_all[:, 1:], gt_all[:, 1:]
+        R, t = self.get_transform()
+        points_preds = points_preds @ R.T + t
         pos_error = dis2me(points_preds, points_labels)
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
                      {"points_preds":points_preds,
                       "points_labels":points_labels,
                       "pos_error":pos_error})
 
-        self.logger1.info('Location Median Error on testing set:%s', np.median(pos_error))
+        self.logger1.info('Location Median Error on testing set:%s, %s', np.median(pos_error), np.std(pos_error))
 
 
     def get_transform(self):
@@ -379,7 +395,7 @@ class LocGPT_Runner():
         # # R = 3x3 rotation matrix
         # # t = 3 column vector
         # # B = A@R.T + t
-        pred_all, gt_all = self.pred(self.transform_iter)
+        pred_all, gt_all = self.pred(self.transform_iter, self.train_spt, self.train_label)
         pred_pos, gt_pos = pred_all[:, 1:], gt_all[:, 1:]
         pos_error = np.linalg.norm(gt_pos-pred_pos, axis=1)
 
@@ -427,13 +443,12 @@ class LocGPT_Runner():
         return R, t
 
 
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/s02-seq-overlap.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=1)
-    parser.add_argument('--mode', type=str, default='train')
+    parser.add_argument('--config', type=str, default='conf/s33-2.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=2)
+    parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
@@ -451,3 +466,5 @@ if __name__ == '__main__':
         worker.train_network()
     if args.mode == 'test':
         worker.eval_network()
+        
+        

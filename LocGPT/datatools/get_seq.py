@@ -51,7 +51,7 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 if __name__ == "__main__":
 
     seq_len = 10
-    data_path = "data/transformer-test/data-s02.csv"
+    data_path = "../data/variants/data-s33.csv"
 
     blt = Bartlett()
     df = pd.read_csv(data_path)
@@ -89,5 +89,5 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
-    torch.save(train_data, "train_data-s02.t")
-    torch.save(test_data, "test_data-s02.t")
+    torch.save(train_data, "train_data-s33.t")
+    torch.save(test_data, "test_data-s33.t")
