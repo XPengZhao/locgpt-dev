@@ -273,8 +273,9 @@ class Encoder(nn.Module):
         enc_input: tensor, [B, n_seq, feature_dim]
         """
         attn_padding_mask = get_padding_mask(enc_token, enc_token) # [batch, target_len, target_len]
+        x = enc_input
         for attn, ff in self.layers:
-            x = attn(enc_input, q_input=enc_input, k_input=enc_input, v_input=enc_input, attn_mask=attn_padding_mask)
+            x = attn(x, q_input=x, k_input=x, v_input=x, attn_mask=attn_padding_mask)
             x = ff(x, inputs=x)
         omega = self.mlp_head(x)  # [B, n_seq, 2]
 
@@ -321,8 +322,9 @@ class Decoder(nn.Module):
     dec_input += self.pos_embedding                  # 加位置嵌入（直接加）      (b, 1, dim)
 
     # masked mutlihead attention
+    x = dec_input
     for attn1, attn2, ff in self.layers:
-        x = attn1(dec_input,  q_input=dec_input, k_input=dec_input, v_input=dec_input, attn_mask=attn1_mask)
+        x = attn1(x,  q_input=x, k_input=x, v_input=x, attn_mask=attn1_mask)
         x = attn2(x,  q_input=x, k_input=enc_output, v_input=enc_output, attn_mask=attn2_mask)
         x = ff(x, inputs=x)
     return x
