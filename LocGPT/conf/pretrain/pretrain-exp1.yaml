@@ -65,7 +65,7 @@ networks:
     heads: 8
     dim_head: 64
     mlp_dim: 1024
-    dropout: 0
+    dropout: 0.2
 
 
 
@@ -73,7 +73,7 @@ networks:
 training:
   lr: 1e-4
   weight_decay: 1e-4
-  batch_size: 8192
+  batch_size: 32678
   total_epoches: 13000
   i_save: 10    # model save epoch
   beta: 0.01   # loss weight
