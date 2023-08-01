@@ -332,7 +332,8 @@ class Decoder(nn.Module):
 class LocGPT(nn.Module):
     def __init__(self, **kwargs):
         super(LocGPT, self).__init__()
-        self.encoder1, self.encoder2, self.encoder3 = [Encoder(**kwargs) for _ in range(3)]
+        # self.encoder1, self.encoder2, self.encoder3 = [Encoder(**kwargs) for _ in range(3)]
+        self.encoder = Encoder(**kwargs)
         self.decoder = Decoder(**kwargs)
         self.pos_linear = nn.Linear(kwargs['dim'], 3, bias=False)
 
@@ -357,9 +358,9 @@ class LocGPT(nn.Module):
         spt_dim = 9*36
 
         # time_embedding = self.pe_time_linear(timestamp)  # [B, n_seq, 1]  -> (..., dim)
-        omega1, enc_output1 = self.encoder1(enc_token, torch.concat((timestamp, enc_input[..., 0*spt_dim:1*spt_dim]), dim=-1))
-        omega2, enc_output2 = self.encoder2(enc_token, torch.concat((timestamp, enc_input[..., 1*spt_dim:2*spt_dim]), dim=-1))
-        omega3, enc_output3 = self.encoder3(enc_token, torch.concat((timestamp, enc_input[..., 2*spt_dim:3*spt_dim]), dim=-1))
+        omega1, enc_output1 = self.encoder(enc_token, torch.concat((timestamp, enc_input[..., 0*spt_dim:1*spt_dim]), dim=-1))
+        omega2, enc_output2 = self.encoder(enc_token, torch.concat((timestamp, enc_input[..., 1*spt_dim:2*spt_dim]), dim=-1))
+        omega3, enc_output3 = self.encoder(enc_token, torch.concat((timestamp, enc_input[..., 2*spt_dim:3*spt_dim]), dim=-1))
 
         ## gateway embedding
         gateway1_embedding = gateway_pos[...,0:3]  # [B, 1, 3]

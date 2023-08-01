@@ -32,9 +32,9 @@ def compute_intersection(p1, v1, p2, v2):
     one = torch.ones(v1_.shape)
     A = torch.cat((v1_, v2_, one.to(v1.device)), dim=2)
     A_inv = torch.pinverse(A)
-    b = (p2 - p1).squeeze()
+    b = (p2 - p1).unsqueeze(-1)
     # x = torch.linalg.solve(A, b)
-    x = torch.matmul(A_inv, b)
+    x = torch.matmul(A_inv, b).squeeze()
     zero = x[:, 2].unsqueeze(-1)
     if not torch.allclose(zero, torch.zeros_like(zero)):
         return 1
