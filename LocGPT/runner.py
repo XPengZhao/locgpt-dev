@@ -436,7 +436,7 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/fine-tune/lora-exp1.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/fine-tune/direct-exp1.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--mode', type=str, default='test', help='train or test')
     args = parser.parse_args()
