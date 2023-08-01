@@ -61,7 +61,7 @@ networks:
   init_weight: true
   transformer:
     dim: 325
-    depth: 6
+    depth: 2
     heads: 8
     dim_head: 64
     mlp_dim: 1024
