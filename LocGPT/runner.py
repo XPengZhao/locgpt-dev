@@ -136,10 +136,25 @@ class LocGPT_Runner():
             print('Reload from', ckpt_path)
             ckpt = torch.load(ckpt_path, map_location=self.devices)
 
-            self.locgpt.load_state_dict(ckpt['locgpt_state_dict'])
-            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-            self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,T_max=20,eta_min=1e-5)
-            self.cosine_schedule.load_state_dict(ckpt['schedule_state_dict'])
+            ## partial load model if needed
+            saved_model_dict = ckpt['locgpt_state_dict']
+            model_dict = self.locgpt.state_dict()
+
+            pre_filter_keys = set(saved_model_dict.keys())
+            saved_model_dict = {k: v for k, v in saved_model_dict.items() if k in model_dict
+                                and saved_model_dict[k].shape == model_dict[k].shape}
+
+            model_dict.update(saved_model_dict)
+            self.locgpt.load_state_dict(model_dict)
+            post_filter_keys = set(saved_model_dict.keys())
+
+            # if all loaded
+            if pre_filter_keys == post_filter_keys:
+                self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+                self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,T_max=1000,eta_min=1e-6)
+                self.cosine_schedule.load_state_dict(ckpt['schedule_state_dict'])
+                self.logger.info("Reloaded optimizer from %s", ckpt_path)
+
             self.epoch_start = ckpt['epoch_start'] + 1
 
 
