@@ -64,15 +64,15 @@ networks:
     depth: 2
     heads: 8
     dim_head: 64
-    mlp_dim: 2048
-    dropout: 0.3
+    mlp_dim: 1024
+    dropout: 0
 
 
 
 ## Training settings
 training:
   lr: 5e-4
-  weight_decay: 1e-3
+  weight_decay: 1e-4
   batch_size: 65536
   total_epoches: 27000
   i_save: 10    # model save epoch
