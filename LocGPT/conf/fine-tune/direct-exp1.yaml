@@ -64,7 +64,7 @@ networks:
     depth: 2
     heads: 8
     dim_head: 64
-    mlp_dim: 2048
+    mlp_dim: 1024
     dropout: 0.2
 
 
