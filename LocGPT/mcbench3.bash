@@ -1,6 +1,15 @@
 #!/bin/bash
 
+
 # Loop over the specific datasets
+# for i in {6..10}
+# do
+   # Skip 25 and 27
+   # if [ "$i" -eq 01 ] || [ "$i" -eq 02 ]
+   # then
+   #    continue
+   # fi
+
 for i in 34 37
 do
    # Zero pad the dataset number
