@@ -66,7 +66,7 @@ networks:
     heads: 8
     dim_head: 64
     mlp_dim: 1024
-    dropout: 0.1
+    dropout: 0.05
 
 
 
@@ -77,5 +77,5 @@ training:
   batch_size: 16384
   total_epoches: 13000
   i_save: 10    # model save epoch
-  beta: 0.005   # loss weight
+  beta: 0.01   # loss weight
   T_max: 1000  # scheduler T_max
