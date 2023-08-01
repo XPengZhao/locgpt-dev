@@ -51,7 +51,7 @@ def get_seq_index(num_seq, seq_len=10, max_step=5):
 if __name__ == "__main__":
 
     seq_len = 10
-    scene = "37"
+    scene = "34"
     data_path = f"data/mcbench/data-s{scene}.csv"
     save_train_path = f"data/mcbench/train_data-s{scene}-seq{seq_len}.t"
     save_test_path = f"data/mcbench/test_data-s{scene}-seq{seq_len}.t"
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
-    save_train_path = f"data/mcbench/train_data-s{scene}-seq1.t"
-    save_test_path = f"data/mcbench/test_data-s{scene}-seq1.t"
+    save_train_path = f"data/mcbench/train_data-s{scene}-seq1.pt"
+    save_test_path = f"data/mcbench/test_data-s{scene}-seq1.pt"
     torch.save(train_data, save_train_path)
     torch.save(test_data, save_test_path)

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Loop over the specific datasets
-for i in 29 30 33 34 37
+for i in 34 37
 do
    # Zero pad the dataset number
    num=$(printf "%02d" $i)
