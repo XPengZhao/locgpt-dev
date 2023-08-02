@@ -17,9 +17,11 @@ if __name__ == '__main__':
     train_scenes = kwargs['dataset']['train_scenes']
     test_scenes = kwargs['dataset']['test_scenes']
 
+    train_scenes = ["s01"]
+
     trainset = torch.empty(0)
     for scene in train_scenes:
-        train_data = torch.load(f"{datapath}train_data-{scene}-seq1.t")  # [N, 1, dim]
+        train_data = torch.load(f"{datapath}train_data-{scene}-seq1.pt")  # [N, 1, dim]
         test_data = torch.load(f"{datapath}test_data-{scene}-seq1.pt")  # [N, 1, dim]
         all_data = torch.concat([train_data, test_data], dim=0)
         gateway_ind = int(scene[1:]) - 1
