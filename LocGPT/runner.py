@@ -84,6 +84,9 @@ class LocGPT_Runner():
         self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,
                                                                     T_max=kwargs_train['T_max'],eta_min=1e-6,
                                                                     last_epoch=-1)
+        total_params = sum(p.numel() for p in self.locgpt.parameters())
+        self.logger.info(f'Total parameters: {total_params}')
+
 
         ## Train settings
         self.epoch_start = 1

@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Loop over the specific datasets
-for i in 2 4
+for i in 2
 do
    # Zero pad the dataset number
    num=$(printf "%01d" $i)
 
    # Construct the yaml file name
-   yaml_file="variant-s10-enc$num.yaml"
+   yaml_file="variant-s10-enc$num-6M.yaml"
 
    # Run the training command
    python runner.py --mode train --gpu 1 --config conf/variant/$yaml_file
