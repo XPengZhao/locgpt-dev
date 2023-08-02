@@ -263,7 +263,7 @@ class LocGPT_Runner():
                     self.optimizer.step()
                     global_iter_num = epoch * num_batches + step + 1
                     pbar.update(1)
-                    pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
+                    pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, l3 loss: {l3.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
                     if global_iter_num % log_step_interval == 0:
                         self.logger_tb.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
                         self.logger_tb.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
