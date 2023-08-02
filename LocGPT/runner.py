@@ -95,7 +95,7 @@ class LocGPT_Runner():
         self.current_epoch = self.epoch_start
         self.batch_size = kwargs_train['batch_size']
         self.total_epoches = kwargs_train['total_epoches']
-        self.beta = kwargs_train['beta']
+        self.beta = float(kwargs_train['beta'])
         self.i_save = kwargs_train['i_save']
         self.mask_id = 0
 
