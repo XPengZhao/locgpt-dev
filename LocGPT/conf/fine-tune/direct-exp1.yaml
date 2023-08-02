@@ -3,8 +3,8 @@ path:
   expname: direct-exp1
   datadir: data/fine-tune/
   logdir: logs/fine-tune/
-  train_file: train_data-s01-40-60-seq1.pt
-  test_file: test_data-s01-40-60-seq1.pt
+  train_file: train_data-s02-40-60-seq1.pt
+  test_file: test_data-s02-40-60-seq1.pt
   load_ckpt: True
 
 
