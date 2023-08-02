@@ -17,7 +17,7 @@ if __name__ == '__main__':
     train_scenes = kwargs['dataset']['train_scenes']
     test_scenes = kwargs['dataset']['test_scenes']
 
-    train_scenes = ["s01"]
+    # train_scenes = ["s01",        "s03", "s04"]
 
     trainset = torch.empty(0)
     for scene in train_scenes:
@@ -36,5 +36,5 @@ if __name__ == '__main__':
         print(f"len train_data-{scene}-seq1.t", len(all_data))
         print(f"len trainset", len(trainset))
 
-    torch.save(trainset, f"{savepath}train_data-pretrain-exp1-seq1.pt")
+    torch.save(trainset, f"{savepath}train_data-all-exp1-seq1.pt")
 
