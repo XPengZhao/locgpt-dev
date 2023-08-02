@@ -4,7 +4,7 @@
 import yaml
 import torch
 
-confpath = "conf/pretrain/pretrain-exp1.yaml"
+confpath = "conf/pretrain/pretrain-exp3.yaml"
 datapath = "data/mcbench/"
 savepath = "data/pretrain/"
 
@@ -36,5 +36,5 @@ if __name__ == '__main__':
         print(f"len train_data-{scene}-seq1.t", len(all_data))
         print(f"len trainset", len(trainset))
 
-    torch.save(trainset, f"{savepath}train_data-all-exp1-seq1.pt")
+    torch.save(trainset, f"{savepath}train_data-all-seq1-normgateway.pt")
 

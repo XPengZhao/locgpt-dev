@@ -91,7 +91,7 @@ class LocGPT_Runner():
         self.current_epoch = self.epoch_start
         self.batch_size = kwargs_train['batch_size']
         self.total_epoches = kwargs_train['total_epoches']
-        self.beta = kwargs_train['beta']
+        self.beta = float(kwargs_train['beta'])
         self.i_save = kwargs_train['i_save']
         self.mask_id = 0
 
@@ -451,8 +451,8 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/pretrain/pretrain-exp1.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=2)
+    parser.add_argument('--config', type=str, default='conf/pretrain/pretrain-exp3.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
