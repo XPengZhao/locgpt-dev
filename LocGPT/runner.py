@@ -95,6 +95,7 @@ class LocGPT_Runner():
         self.current_epoch = self.epoch_start
         self.batch_size = kwargs_train['batch_size']
         self.total_epoches = kwargs_train['total_epoches']
+        self.loss = kwargs_train['loss']
         self.beta = float(kwargs_train['beta'])
         self.i_save = kwargs_train['i_save']
         self.mask_id = 0
@@ -172,16 +173,32 @@ class LocGPT_Runner():
         x: [B, n_seq, 4]. area+pos
         mask: [B, n_seq]
         """
+
+        def loss_dist(preds, labels):
+            l_ = preds.shape[0]
+            w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
+            diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
+            diff_preds = torch.norm(diff_preds, dim=-1)
+            diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
+            diff_labels = torch.norm(diff_labels, dim=-1)
+            return torch.mean((diff_preds - diff_labels) ** 2)
+
+
         mask = torch.logical_not(mask)
 
-        l1 = x[..., 0][mask]
-        l1 = torch.mean(l1**2)
+        area_loss = torch.mean(x[..., 0][mask]**2)
+        if self.loss == "L0":
+            dis_loss = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+            dis_loss = torch.mean(dis_loss[mask] ** 2)
+            loss = dis_loss
+        elif self.loss == "L1":
+            dis_loss = loss_dist(x[mask], y[mask])
+            loss = dis_loss
+        elif self.loss == "L2":
+            dis_loss = loss_dist(x[mask], y[mask])
+            loss = self.beta * area_loss + (1-self.beta) * dis_loss
 
-        l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
-        l2 = torch.mean(l2[mask] ** 2)
-        l3 = self.beta * l1 + (1-self.beta) * l2
-
-        return l1, l2, l3
+        return area_loss, dis_loss, loss
 
 
     def get_random_mask(self, B, n_seq):
@@ -203,9 +220,9 @@ class LocGPT_Runner():
         #     mask[i, mask_start[i]:mask_end[i]] = 0
 
         ## mask 3
-        mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
-        mask[:, 0:self.mask_id+1] = 0
-        self.mask_id = (self.mask_id + 1) % n_seq
+        # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+        # mask[:, 0:self.mask_id+1] = 0
+        # self.mask_id = (self.mask_id + 1) % n_seq
 
 
         mask = mask.eq(1).to(self.devices)   # B, seq
@@ -342,17 +359,17 @@ class LocGPT_Runner():
         # After Transform
         self.logger.info("after transform---------------------------")
         points_preds_test_A = points_preds_test @ R.T + t
-        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
+        pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
         self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
+                         np.median(pos_error_test_A, axis=0), np.std(pos_error_test_A, axis=0))
         self.logger.info('After transform, Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test), np.std(pos_error_test))
+                         np.median(pos_error_test_A), np.std(pos_error_test_A))
 
 
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
                      {"points_preds":points_preds_test_A,
                       "points_labels":points_labels_test,
-                      "pos_error":pos_error_test})
+                      "pos_error":pos_error_test_A})
 
 
 

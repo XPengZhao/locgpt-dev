@@ -1,0 +1,38 @@
+## Path settings
+path:
+  expname: s10-l0
+  datadir: data/mcbench/
+  logdir: logs/ablation/
+  train_file: train_data-s10-seq1.pt
+  test_file: test_data-s10-seq1.pt
+  load_ckpt: True
+
+
+## Dataset settings
+dataset:
+  gateways_pos: [[-0.1908, 0.9816, -0.0000], [-0.0175, -0.9998, -0.0000], [0.3412, 0.9374, 0.0698]]
+  n_seq: 1
+
+## Network settings
+networks:
+  init_weight: true
+  transformer:
+    dim: 325
+    depth: 2
+    heads: 8
+    dim_head: 64
+    mlp_dim: 1024
+    dropout: 0.1
+
+
+
+## Training settings
+training:
+  lr: 1e-4
+  weight_decay: 1e-4
+  batch_size: 1024
+  total_epoches: 5000
+  i_save: 10    # model save epoch
+  loss: "L0"    # L0: location loss;  L2: location diff loss + area loss
+  beta: 1e-12   # loss weight
+  T_max: 1000  # scheduler T_max
