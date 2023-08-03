@@ -11,7 +11,6 @@ import numpy as np
 import scipy.io as scio
 import torch
 import torch.nn as nn
-import torch.nn.parallel
 import torch.optim as optim
 import yaml
 from einops import rearrange
@@ -24,6 +23,8 @@ from model import LocGPT
 
 dis2mse = lambda x, y: torch.mean((x - y) ** 2)
 dis2me = lambda x, y: np.linalg.norm(x - y, axis=-1)
+
+torch.autograd.set_detect_anomaly(True)
 
 
 class MyDataset(Dataset):
@@ -86,11 +87,14 @@ class LocGPT_Runner():
 
         ## Train settings
         self.epoch_start = 1
+        if kwargs_path['load_pretrain'] and mode=='train':
+            self.load_pretrained()
         if kwargs_path['load_ckpt'] or mode=='test':
             self.load_checkpoints()
         self.current_epoch = self.epoch_start
         self.batch_size = kwargs_train['batch_size']
         self.total_epoches = kwargs_train['total_epoches']
+        self.loss = kwargs_train['loss']
         self.beta = kwargs_train['beta']
         self.i_save = kwargs_train['i_save']
         self.mask_id = 0
@@ -120,6 +124,35 @@ class LocGPT_Runner():
     def init_weights(self, m):
             if type(m) == nn.Linear:
                 nn.init.xavier_uniform_(m.weight)
+
+
+    def load_pretrained(self):
+        """load pretrained model
+        """
+        pretrain_dir = os.path.join(self.datadir, "pretrain-exp3.tar")
+        self.logger.info("Load pretrained model from %s", pretrain_dir)
+        ckpt = torch.load(pretrain_dir, map_location=self.devices)
+
+        pretrained_dict = ckpt['locgpt_state_dict']
+        model_dict = self.locgpt.state_dict()
+
+        # Copy the encoder parameters to each of the encoders in the new model
+        for name, param in pretrained_dict.items():
+            if 'encoder' in name:
+                for i in range(1, 4):
+                    new_name = name.replace('encoder', f'encoder{i}')
+                    if new_name in model_dict:
+                        model_dict[new_name] = param
+                        self.logger.debug("Copy pretrained %s to %s", name, new_name)
+
+        # Copy the other parameters (like the decoder parameters) directly
+        for name, param in pretrained_dict.items():
+            if 'encoder' not in name:
+                if name in model_dict:
+                    model_dict[name] = param
+
+        self.locgpt.load_state_dict(model_dict)
+
 
 
     def load_checkpoints(self):
@@ -168,16 +201,36 @@ class LocGPT_Runner():
         x: [B, n_seq, 4]. area+pos
         mask: [B, n_seq]
         """
+
+        def loss_dist(preds, labels):
+            l_ = preds.shape[0]
+            w = torch.tensor([(i, j) for i in range(l_ - 1) for j in range(i + 1, l_)]).to(preds.device)
+            diff_preds = preds[w[:, 0], 1:] - preds[w[:, 1], 1:]
+            diff_preds = torch.norm(diff_preds, dim=-1)
+            diff_labels = labels[w[:, 0], 1:] - labels[w[:, 1], 1:]
+            diff_labels = torch.norm(diff_labels, dim=-1)
+            return torch.mean((diff_preds - diff_labels) ** 2)
+
+
         mask = torch.logical_not(mask)
 
-        l1 = x[..., 0][mask]
-        l1 = torch.mean(l1**2)
+        area_loss = torch.mean(x[..., 0][mask]**2)
+        if self.loss == "L0":
+            dis_loss = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+            dis_loss = torch.mean(dis_loss[mask] ** 2)
+            loss = dis_loss
+        elif self.loss == "L1":
+            dis_loss = loss_dist(x[mask], y[mask])
+            loss = dis_loss
+        elif self.loss == "L2":
+            dis_loss = loss_dist(x[mask], y[mask])
+            loss = self.beta * area_loss + (1-self.beta) * dis_loss
+        elif self.loss == "L3":
+            dis_loss = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
+            dis_loss = torch.mean(dis_loss[mask] ** 2)
+            loss = self.beta * area_loss + (1-self.beta) * dis_loss
 
-        l2 = torch.linalg.norm(x[..., 1:] - y[..., 1:], dim=-1)
-        l2 = torch.mean(l2[mask] ** 2)
-        l3 = self.beta * l1 + (1-self.beta) * l2
-
-        return l1, l2, l3
+        return area_loss, dis_loss, loss
 
 
     def get_random_mask(self, B, n_seq):
@@ -344,17 +397,17 @@ class LocGPT_Runner():
         # After Transform
         self.logger.info("after transform---------------------------")
         points_preds_test_A = points_preds_test @ R.T + t
-        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
+        pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
         self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
+                         np.median(pos_error_test_A, axis=0), np.std(pos_error_test_A, axis=0))
         self.logger.info('After transform, Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test), np.std(pos_error_test))
+                         np.median(pos_error_test_A), np.std(pos_error_test_A))
 
 
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
-                     {"points_preds":points_preds_test_A,
+                     {"points_preds":points_preds_test,
                       "points_labels":points_labels_test,
-                      "pos_error":pos_error_test})
+                      "pos_error":pos_error_test_A})
 
 
 
@@ -383,11 +436,11 @@ class LocGPT_Runner():
         points_preds_train_A = points_preds_train @ R.T + t
         points_preds_train_A = rearrange(points_preds_train_A, '(b n) d -> b n d', n=self.n_seq)
         points_labels_train = rearrange(points_labels_train, '(b n) d -> b n d', n=self.n_seq)
-        pos_error_train = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)
+        pos_error_train_A = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)
         self.logger.info('After transform, Location error on training set each trace median:%s, std:%s',
-                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+                         np.median(pos_error_train_A, axis=0), np.std(pos_error_train_A, axis=0))
         self.logger.info('After transform, Location Error on training set globally median:%s, std:%s',
-                         np.median(pos_error_train), np.std(pos_error_train))
+                         np.median(pos_error_train_A), np.std(pos_error_train_A))
 
         ## save results and loggers
         scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
@@ -409,12 +462,16 @@ class LocGPT_Runner():
         coords_A = torch.tensor(coords_A, dtype=torch.float32)
         coords_B = torch.tensor(coords_B, dtype=torch.float32)
 
+        # mean_B = coords_B.mean(dim=0, keepdim=True)
+        # coords_B = (coords_B - mean_B)
+
+
         # Initialize parameters
         R = nn.Parameter(torch.eye(3))  # Initialize rotation matrix as identity
         t = nn.Parameter(torch.zeros(3))  # Initialize translation vector as zero
 
         # Set up the optimizer
-        optimizer = optim.SGD([R, t], lr=0.05)
+        optimizer = optim.SGD([R, t], lr=0.005)
 
         # Training loop
         for i in range(10001):  # 1000 iterations
@@ -426,7 +483,7 @@ class LocGPT_Runner():
             loss.backward()
             optimizer.step()
 
-            if i % 5000 == 0:  # Print loss every 100 iterations
+            if i % 1000 == 0:  # Print loss every 100 iterations
                 print(f"Iteration {i}: Loss = {loss.item()}")
 
         return R, t
@@ -436,7 +493,7 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/fine-tune/direct-exp1.yaml', help='config file path')
+    parser.add_argument('--config', type=str, default='conf/fine-tune/direct-s2-40.yaml', help='config file path')
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--mode', type=str, default='test', help='train or test')
     args = parser.parse_args()

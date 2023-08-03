@@ -4,7 +4,7 @@
 import yaml
 import torch
 
-confpath = "conf/pretrain/pretrain-exp1.yaml"
+confpath = "conf/pretrain/pretrain-exp3.yaml"
 datapath = "data/mcbench/"
 savepath = "data/pretrain/"
 
@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     trainset = torch.empty(0)
     for scene in train_scenes:
-        train_data = torch.load(f"{datapath}train_data-{scene}-seq1.t")  # [N, 1, dim]
+        train_data = torch.load(f"{datapath}train_data-{scene}-seq1.pt")  # [N, 1, dim]
         gateway_ind = int(scene[1:]) - 1
         train_gateway_pos = torch.tensor(gateway_pos[gateway_ind]).view(-1) #[9]
         train_gateway_pos = train_gateway_pos.unsqueeze(0).unsqueeze(0).repeat(train_data.shape[0], 1, 1)

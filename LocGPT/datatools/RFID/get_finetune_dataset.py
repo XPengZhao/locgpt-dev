@@ -4,7 +4,7 @@
 import yaml
 import torch
 
-confpath = "conf/pretrain/pretrain-exp1.yaml"
+confpath = "conf/pretrain/pretrain-exp3.yaml"
 datapath = "data/mcbench/"
 savepath = "data/fine-tune/"
 

@@ -2,7 +2,7 @@
 
 ## Path settings
 path:
-  expname: pretrain-exp1
+  expname: pretrain-exp3
   datadir: data/pretrain/
   logdir: logs/pretrain/
   train_file: train_data-all-seq1-normgateway.pt
@@ -75,8 +75,8 @@ networks:
 training:
   lr: 5e-4
   weight_decay: 1e-4
-  batch_size: 32678
-  total_epoches: 15000
+  batch_size: 8192
+  total_epoches: 31000
   i_save: 10    # model save epoch
   beta: 0.01   # loss weight
   T_max: 1000  # scheduler T_max
