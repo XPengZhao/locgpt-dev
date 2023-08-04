@@ -1,15 +1,20 @@
-# DLoc: 
+### DLoc: 
 
-## Parameters: 16.6M
+- Parameters: 16.6M
 
-------
+### LocGPT:
 
-# LocGPT:
+- Parameters: 12.0M
 
-## Parameters: 12.0M
+- Fine-Tune Methods:
 
-------
+  - LoRA:
+    - Trainable Parameters(rank=16): 881024/12894397 = 6.8%
 
-# GPT:
+  - Adapters:
+    - Trainable Parameters(hidden_size=64): 769548/12769175 = 6.0%
 
-## Parameters: 117M
+### GPT:
+
+- Parameters: 117M
+
