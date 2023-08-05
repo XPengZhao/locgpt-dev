@@ -94,9 +94,10 @@ class Bartlett():
 
 if __name__ == '__main__':
 
-    scene = "jacobs_Aug16_3"
+    scene = "July22_2_ref"
     filepath = f'data/wifi/channels_{scene}.mat'
     batch_size = 128
+    atn_num = 4
 
     with h5py.File(filepath, 'r') as f:
         print(list(f.keys()))
@@ -110,8 +111,8 @@ if __name__ == '__main__':
         # freq = np.median(freq)
 
         ap = f['ap']
-        atn_num = len(ap)
-        gateway_pos = np.zeros((atn_num, 3))
+        ap_num = len(ap)
+        gateway_pos = np.zeros((ap_num, 3))
         for i, col in enumerate(ap):
             ap_pos = f[col[0]][:]
             ap_pos = np.mean(ap_pos, axis=-1)
@@ -119,12 +120,12 @@ if __name__ == '__main__':
         print("gateway_pos: ", gateway_pos)
 
     # [timestamp_1 + area_1 + pos_3 + spt_324]
-    data_all = torch.zeros((data_len, 1+1+3+4*9*36))
+    data_all = torch.zeros((data_len, 1+1+3+ap_num*9*36))
     data_all[...,2:4] = labels
 
 
     ## linear antenna array
-    atn_loc_x = np.linspace(0, (atn_num - 1) * atn_sep, atn_num)
+    atn_loc_x = np.linspace(0, 3 * atn_sep, atn_num)
     atn_loc_y = np.zeros(atn_num)
     atn_loc_z = np.zeros(atn_num)
     atn_loc = np.vstack((atn_loc_x, atn_loc_y, atn_loc_z))
@@ -137,8 +138,8 @@ if __name__ == '__main__':
         heatmap1 = worker.get_aoa_heatmap(phase[...,0]).detach().cpu().unsqueeze(1)  # [B, 1, 9, 36]
         heatmap2 = worker.get_aoa_heatmap(phase[...,1]).detach().cpu().unsqueeze(1)
         heatmap3 = worker.get_aoa_heatmap(phase[...,2]).detach().cpu().unsqueeze(1)
-        heatmap4 = worker.get_aoa_heatmap(phase[...,2]).detach().cpu().unsqueeze(1)
-        heatmap = torch.concat((heatmap1, heatmap2, heatmap3, heatmap4), dim=1)  # [B, 4, 9, 36]
+        # heatmap4 = worker.get_aoa_heatmap(phase[...,3]).detach().cpu().unsqueeze(1)
+        heatmap = torch.concat((heatmap1, heatmap2, heatmap3), dim=1)  # [B, 4, 9, 36]
         heatmap = rearrange(heatmap, 'b c h w -> b (c h w)')  # [B, 4*9*36]
         data_all[i:i+batch_size, 5:] = heatmap
 
