@@ -192,12 +192,13 @@ def get_lookself_mask(seq):
 
 
 class PostNorm(nn.Module):
-    def __init__(self, dim, fn):
+    def __init__(self, dim, fn, hidden_size):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
         self.fn = fn
+        self.adapter = Adapter(dim, hidden_size)
     def forward(self, x, **kwargs):
-        return self.norm(self.fn(**kwargs) + x)
+        return self.norm(self.adapter(self.fn(**kwargs)) + x)
 
 
 class FeedForward(nn.Module):
@@ -251,13 +252,13 @@ class Attention(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, hidden_size, dropout=0.):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
-                PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+                PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), hidden_size),
+                PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout), hidden_size)
             ]))
         self.mlp_head = nn.Linear(dim, 2)
 
@@ -280,16 +281,16 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-  def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+  def __init__(self, dim, depth, heads, dim_head, mlp_dim, hidden_size, dropout=0.):
     super().__init__()
     self.pos_embedding = nn.Parameter(torch.randn(1, 1, dim))
 
     self.layers = nn.ModuleList([])
     for _ in range(depth):
         self.layers.append(nn.ModuleList([
-            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder
-            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),  # decoder-encoder
-            PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), hidden_size),  # decoder
+            PostNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout), hidden_size),  # decoder-encoder
+            PostNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout), hidden_size)
         ]))
 
   def forward(self, enc_token, enc_output, dec_token, dec_input):

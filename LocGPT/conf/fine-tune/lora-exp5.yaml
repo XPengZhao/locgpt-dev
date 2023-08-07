@@ -1,6 +1,6 @@
 ## Path settings
 path:
-  expname: fune-tune-adapter-s02_28
+  expname: fune-tune-lora-s02_28
   datadir: data/fine-tune/
   logdir: logs/fine-tune/
   train_file: train_data-s02-20-80-seq1.pt
@@ -65,7 +65,7 @@ networks:
     heads: 8
     dim_head: 64
     mlp_dim: 1024
-    hidden_size: 64
+    # hidden_size: 64
     dropout: 0.2
 
 
