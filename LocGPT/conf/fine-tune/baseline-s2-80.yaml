@@ -1,14 +1,12 @@
-## load the pretrained model
 ## Path settings
 path:
-  expname: direct-s2-40
+  expname: baseline-s2-80
   datadir: data/fine-tune/
   logdir: logs/fine-tune/
-  train_file: train_data-s02-40-60-seq1.pt
-  test_file: test_data-s02-40-60-seq1.pt
+  train_file: train_data-s02-80-20-seq1.pt
+  test_file: test_data-s02-80-20-seq1.pt
   load_ckpt: True
-  load_pretrain: True
-
+  load_pretrain: False
 
 ## Dataset settings
 dataset:

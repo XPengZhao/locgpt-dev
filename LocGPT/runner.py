@@ -98,6 +98,8 @@ class LocGPT_Runner():
         self.beta = kwargs_train['beta']
         self.i_save = kwargs_train['i_save']
         self.mask_id = 0
+        self.error_median_over_epoch = []
+        self.error_std_over_epoch = []
 
         ## Dataset
         train_data_dir = os.path.join(self.datadir, self.train_file)
@@ -324,6 +326,9 @@ class LocGPT_Runner():
             if self.current_epoch % self.i_save == 0:
                 self.saveckpts()
 
+            if self.current_epoch % 10 == 0:
+                self.eval_network()
+
 
 
 
@@ -381,34 +386,39 @@ class LocGPT_Runner():
 
     def eval_network(self):
 
-        self.logger.info("Start eval network----------------------------------")
+        self.logger.info("Start eval network ###################################")
         R,t = self.get_transform()
 
         self.logger.info("before transform---------------------------")
         pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
         pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
-        self.logger.info('Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
-        self.logger.info('Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test), np.std(pos_error_test))
+        # self.logger.info('Error on testing each trace set:\n mean:%.3f\n std:%.3f',
+        #                  np.median(pos_error_test, axis=0).item(), np.std(pos_error_test, axis=0).item())
+        self.logger.info('Error on testset globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test).item(), np.std(pos_error_test).item())
 
 
         # After Transform
         self.logger.info("after transform---------------------------")
         points_preds_test_A = points_preds_test @ R.T + t
         pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
-        self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test_A, axis=0), np.std(pos_error_test_A, axis=0))
-        self.logger.info('After transform, Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test_A), np.std(pos_error_test_A))
+        # self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
+        #                  np.median(pos_error_test_A, axis=0), np.std(pos_error_test_A, axis=0))
+        self.logger.info('Error on testset globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test_A).item(), np.std(pos_error_test_A).item())
 
 
-        scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
+        scio.savemat(os.path.join(self.logdir, self.expname, f"test_pos_pred.mat"),
                      {"points_preds":points_preds_test,
                       "points_labels":points_labels_test,
-                      "pos_error":pos_error_test_A})
+                      "pos_error":pos_error_test})
 
+        self.error_median_over_epoch.append(np.median(pos_error_test).item())
+        self.error_std_over_epoch.append(np.std(pos_error_test).item())
+        scio.savemat(os.path.join(self.logdir, self.expname, f"error_over_epoch.mat"),
+                     {"error_median":np.array(self.error_median_over_epoch),
+                      "error_std":np.array(self.error_std_over_epoch)})
 
 
 
@@ -421,10 +431,10 @@ class LocGPT_Runner():
         pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
         points_preds_train, points_labels_train = pred_all_train[..., 1:], gt_all_train[..., 1:]
         pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=-1)
-        self.logger.info('Location error on training set each trace median:%s, std:%s',
-                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
-        self.logger.info('Location error on training set globally median:%s, std:%s',
-                         np.median(pos_error_train), np.std(pos_error_train))
+        # self.logger.info('Location error on training set each trace median:%s, std:%s',
+        #                  np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+        # self.logger.info('Location error on training set globally median:%s, std:%s',
+        #                  np.median(pos_error_train), np.std(pos_error_train))
 
         points_preds_train = rearrange(points_preds_train, 'b n d -> (b n) d')
         points_labels_train = rearrange(points_labels_train, 'b n d -> (b n) d')
@@ -437,10 +447,10 @@ class LocGPT_Runner():
         points_preds_train_A = rearrange(points_preds_train_A, '(b n) d -> b n d', n=self.n_seq)
         points_labels_train = rearrange(points_labels_train, '(b n) d -> b n d', n=self.n_seq)
         pos_error_train_A = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)
-        self.logger.info('After transform, Location error on training set each trace median:%s, std:%s',
-                         np.median(pos_error_train_A, axis=0), np.std(pos_error_train_A, axis=0))
-        self.logger.info('After transform, Location Error on training set globally median:%s, std:%s',
-                         np.median(pos_error_train_A), np.std(pos_error_train_A))
+        # self.logger.info('After transform, Location error on training set each trace median:%s, std:%s',
+        #                  np.median(pos_error_train_A, axis=0), np.std(pos_error_train_A, axis=0))
+        # self.logger.info('After transform, Location Error on training set globally median:%s, std:%s',
+        #                  np.median(pos_error_train_A), np.std(pos_error_train_A))
 
         ## save results and loggers
         scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
@@ -474,7 +484,7 @@ class LocGPT_Runner():
         optimizer = optim.SGD([R, t], lr=0.005)
 
         # Training loop
-        for i in range(10001):  # 1000 iterations
+        for i in range(3001):  # 1000 iterations
             optimizer.zero_grad()  # Clear previous gradients
 
             # Apply the transformation
@@ -483,7 +493,7 @@ class LocGPT_Runner():
             loss.backward()
             optimizer.step()
 
-            if i % 1000 == 0:  # Print loss every 100 iterations
+            if i % 3000 == 0:  # Print loss every 100 iterations
                 print(f"Iteration {i}: Loss = {loss.item()}")
 
         return R, t

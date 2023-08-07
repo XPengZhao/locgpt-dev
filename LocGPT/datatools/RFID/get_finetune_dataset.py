@@ -16,6 +16,7 @@ if __name__ == '__main__':
     gateway_pos = kwargs['dataset']['gateways_pos']
     train_scenes = kwargs['dataset']['train_scenes']
     test_scenes = kwargs['dataset']['test_scenes']
+    test_scenes = ["s02"]
 
 
     for scene in test_scenes:
@@ -29,12 +30,12 @@ if __name__ == '__main__':
         data_gateway_pos = data_gateway_pos.unsqueeze(0).unsqueeze(0).repeat(all_data.shape[0], 1, 1)
 
         allset = torch.cat([data_gateway_pos, all_data], dim=-1)
-        train_len = int(len(allset) * 0.4)
+        train_len = int(len(allset) * 0.8)
         trainset = allset[:train_len]
         testset = allset[train_len:]
 
         print(f"len trainset", len(trainset))
         print(f"len testset", len(testset))
 
-        torch.save(trainset, f"{savepath}train_data-{scene}-40-60-seq1.pt")
-        torch.save(testset, f"{savepath}test_data-{scene}-40-60-seq1.pt")
+        torch.save(trainset, f"{savepath}train_data-{scene}-80-20-seq1.pt")
+        torch.save(testset, f"{savepath}test_data-{scene}-80-20-seq1.pt")
