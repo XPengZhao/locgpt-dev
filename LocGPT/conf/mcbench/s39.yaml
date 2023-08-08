@@ -10,7 +10,7 @@ path:
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[ 0.,   2.,   0. ],[16.8,  7.6,  0. ],[ 6.4,  7.6,  0. ],[12.4,  0.,   0. ]]
+  gateways_pos: [[ 0.,   0.285,   0. ],[2.7,  1.086,  0. ],[0.914,  1.085,  0. ],[1.77,  0.,   0. ]]
   n_seq: 1
 
 ## Network settings

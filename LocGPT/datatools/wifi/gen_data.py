@@ -9,11 +9,47 @@ import numpy as np
 import scipy.constants as sconst
 import torch
 from einops import rearrange
-
+import random
 
 # Set the random seed
-# np.random.seed(0)
+random.seed(0)
 torch.manual_seed(0)
+
+def get_seq_index(num_seq, seq_len=10, max_step=5):
+    """
+    return
+    ----------
+    seqs: [num_seq, 10]
+    """
+    ind = [i for i in range(num_seq*seq_len)]
+    seqs = []
+
+    for i in range(num_seq):
+        seq = [ind.pop(0)]
+        old_pointer = 0
+        for j in range(seq_len-1):
+            step = random.randint(0,max_step-1)
+            new_pointer = old_pointer + step
+            if new_pointer > len(ind)-1:
+                new_pointer = 0
+                old_pointer = 0
+            if ind[new_pointer] - seq[-1] <= max_step or new_pointer == old_pointer:
+                seq.append(ind.pop(new_pointer))
+            elif new_pointer > old_pointer:
+                while new_pointer > old_pointer:
+                    new_pointer = new_pointer - 1
+                    if ind[new_pointer] - seq[-1] <= max_step:
+                        seq.append(ind.pop(new_pointer))
+                        break
+                    elif new_pointer == old_pointer:
+                        seq.append(ind.pop(new_pointer))
+                        break
+            old_pointer = new_pointer
+            seq.sort()
+        seqs.append(seq)
+
+    return np.array(seqs)
+
 
 class Bartlett():
     """Bartlett Algorithm Searching AoA space
@@ -94,10 +130,11 @@ class Bartlett():
 
 if __name__ == '__main__':
 
-    scene = "July22_2_ref"
-    filepath = f'data/wifi/channels_{scene}.mat'
+    scene = "s45"
+    filepath = f'data/wifi/{scene}.mat'
     batch_size = 128
     atn_num = 4
+    seq_len = 10
 
     with h5py.File(filepath, 'r') as f:
         print(list(f.keys()))
@@ -148,10 +185,14 @@ if __name__ == '__main__':
         #     if j % 1000 == 0:
         #         plm.imsave(f"gateway1/t{i+j}.png", heatmap.cpu().numpy())
 
+    N, dim = data_all.shape
+    data_all = data_all[:N//seq_len*seq_len]
+    n_seq = N//seq_len
+    ind = get_seq_index(n_seq, seq_len)  # [n_seq, 10]
+    data_all = data_all[ind]    # [n_seq, 10, dim]
 
     perm = torch.randperm(data_all.size(0))
     data_all = data_all[perm]
-    data_all = data_all.unsqueeze(1)  # [N, 1, 1+1+3+4*9*36] for seq = 1
 
     train_len = int(len(data_all) * 0.8)
     train_data = data_all[0:train_len]
@@ -160,8 +201,21 @@ if __name__ == '__main__':
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
+    save_train_path = f"data/wifi/train_data-{scene}-seq10.pt"
+    save_test_path = f"data/wifi/test_data-{scene}-seq10.pt"
+    torch.save(train_data, save_train_path)
+    torch.save(test_data, save_test_path)
 
-    save_train_path = f"data/wifi/train_data-s{scene}-seq1.pt"
-    save_test_path = f"data/wifi/test_data-s{scene}-seq1.pt"
+
+    ## save for seq = 1
+    train_data = rearrange(train_data, 'b n d -> (b n) d').unsqueeze(1)
+    test_data = rearrange(test_data, 'b n d -> (b n) d').unsqueeze(1)
+
+
+    print("len train_data", len(train_data))
+    print("len train_data", len(test_data))
+
+    save_train_path = f"data/mcbench/train_data-{scene}-seq1.pt"
+    save_test_path = f"data/mcbench/test_data-{scene}-seq1.pt"
     torch.save(train_data, save_train_path)
     torch.save(test_data, save_test_path)
