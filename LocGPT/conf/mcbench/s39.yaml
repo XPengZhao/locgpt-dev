@@ -3,15 +3,15 @@ path:
   expname: s39
   datadir: data/wifi/
   logdir: logs/mcbench/
-  train_file: train_data-s39-seq1.pt
-  test_file: test_data-s39-seq1.pt
+  train_file: train_data-s39-seq10.pt
+  test_file: test_data-s39-seq10.pt
   load_ckpt: True
 
 
 ## Dataset settings
 dataset:
   gateways_pos: [[ 0.,   0.285,   0. ],[2.7,  1.086,  0. ],[0.914,  1.085,  0. ],[1.77,  0.,   0. ]]
-  n_seq: 1
+  n_seq: 10
 
 ## Network settings
 networks:
