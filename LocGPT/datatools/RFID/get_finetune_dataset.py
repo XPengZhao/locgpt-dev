@@ -30,12 +30,12 @@ if __name__ == '__main__':
         data_gateway_pos = data_gateway_pos.unsqueeze(0).unsqueeze(0).repeat(all_data.shape[0], 1, 1)
 
         allset = torch.cat([data_gateway_pos, all_data], dim=-1)
-        train_len = int(len(allset) * 0.8)
+        train_len = int(len(allset) * 0.6)
         trainset = allset[:train_len]
         testset = allset[train_len:]
 
         print(f"len trainset", len(trainset))
         print(f"len testset", len(testset))
 
-        torch.save(trainset, f"{savepath}train_data-{scene}-80-20-seq1.pt")
-        torch.save(testset, f"{savepath}test_data-{scene}-80-20-seq1.pt")
+        torch.save(trainset, f"{savepath}train_data-{scene}-60-40-seq1.pt")
+        torch.save(testset, f"{savepath}test_data-{scene}-60-40-seq1.pt")
