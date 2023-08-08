@@ -192,7 +192,7 @@ class LocGPT_Runner():
         """
 
         ## mask 1
-        mask = torch.zeros((B, n_seq))
+        # mask = torch.zeros((B, n_seq))
 
         ## mask 2
         # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
@@ -326,7 +326,7 @@ class LocGPT_Runner():
 
     def eval_network(self):
 
-        self.logger.info("Start eval network----------------------------------")
+        self.logger.info("Start eval network ###################################")
         R,t = self.get_transform()
 
         self.logger.info("before transform---------------------------")
@@ -334,26 +334,28 @@ class LocGPT_Runner():
         points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
         points_preds_test[..., -1] = 0
         pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
-        self.logger.info('Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
-        self.logger.info('Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test), np.std(pos_error_test))
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test).item(), np.std(pos_error_test).item())
 
 
         # After Transform
         self.logger.info("after transform---------------------------")
         points_preds_test_A = points_preds_test @ R.T + t
-        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
-        self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test, axis=0), np.std(pos_error_test, axis=0))
-        self.logger.info('After transform, Location error on testing globally set:\n mean:%s\n std:%s',
-                         np.median(pos_error_test), np.std(pos_error_test))
+        pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test_A, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test_A, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test_A).item(), np.std(pos_error_test_A).item())
 
 
         scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
                      {"points_preds":points_preds_test_A,
                       "points_labels":points_labels_test,
-                      "pos_error":pos_error_test})
+                      "pos_error":pos_error_test_A})
 
 
 
