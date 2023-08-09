@@ -365,12 +365,9 @@ class LocGPT(nn.Module):
         omega3, enc_output3 = self.encoder3(enc_token, torch.concat((timestamp, enc_input[..., 2*spt_dim:3*spt_dim]), dim=-1))
 
         ## gateway embedding
-        gateway1_embedding = gateway_pos[...,0:3]  # [B, 1, 3]
-        gateway2_embedding = gateway_pos[...,3:6]
-        gateway3_embedding = gateway_pos[...,6:9]
-        gateway1_embedding = self.pe_gateway_linear(gateway1_embedding)  # [B, 1, 3] -> [B, 1, dim]
-        gateway2_embedding = self.pe_gateway_linear(gateway2_embedding)
-        gateway3_embedding = self.pe_gateway_linear(gateway3_embedding)
+        gateway1_embedding = self.pe_gateway_linear(gateway_pos[...,0:3])  # [B, 1, 3] -> [B, 1, dim]
+        gateway2_embedding = self.pe_gateway_linear(gateway_pos[...,3:6])
+        gateway3_embedding = self.pe_gateway_linear(gateway_pos[...,6:9])
 
         enc_output1 = enc_output1 + gateway1_embedding
         enc_output2 = enc_output2 + gateway2_embedding

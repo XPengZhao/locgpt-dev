@@ -254,9 +254,9 @@ class LocGPT_Runner():
         #     mask[i, mask_start[i]:mask_end[i]] = 0
 
         ## mask 3
-        mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
-        mask[:, 0:self.mask_id+1] = 0
-        self.mask_id = (self.mask_id + 1) % n_seq
+        # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+        # mask[:, 0:self.mask_id+1] = 0
+        # self.mask_id = (self.mask_id + 1) % n_seq
 
 
         mask = mask.eq(1).to(self.devices)   # B, seq
