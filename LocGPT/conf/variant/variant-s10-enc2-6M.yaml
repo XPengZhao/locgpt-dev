@@ -1,16 +1,16 @@
 ## Path settings
 path:
-  expname: s30
+  expname: s10-enc2-6M
   datadir: data/mcbench/
-  logdir: logs/mcbench/
-  train_file: train_data-s30-seq1.t
-  test_file: test_data-s30-seq1.t
+  logdir: logs/variant/
+  train_file: train_data-s10-seq1.pt
+  test_file: test_data-s10-seq1.pt
   load_ckpt: True
 
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[1.7101,   -4.6985,   -0.0000],[0.9517,    4.8962,    0.3488],[-1.2096,   -4.8515,   -0.0000]]
+  gateways_pos: [[-9.5405,   49.0814,   -0.0000],[-0.8726,  -49.9924,   -0.0000],[17.0593,   46.8702,    3.4878]]
   n_seq: 1
 
 ## Network settings
@@ -20,9 +20,9 @@ networks:
     dim: 325
     depth: 2
     heads: 8
-    dim_head: 64
-    mlp_dim: 1024
-    dropout: 0
+    dim_head: 32
+    mlp_dim: 512
+    dropout: 0.1
 
 
 
@@ -31,7 +31,7 @@ training:
   lr: 1e-4
   weight_decay: 1e-4
   batch_size: 1024
-  total_epoches: 11000
+  total_epoches: 7000
   i_save: 10    # model save epoch
   beta: 0.01   # loss weight
   T_max: 1000  # scheduler T_max

@@ -3,14 +3,14 @@ path:
   expname: s03
   datadir: data/mcbench/
   logdir: logs/mcbench/
-  train_file: train_data-s03-seq10.t
-  test_file: test_data-s03-seq10.t
+  train_file: train_data-s03-seq10.pt
+  test_file: test_data-s03-seq10.pt
   load_ckpt: True
 
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[11.1200,10.0125,1.0463],[-7.4817,12.9587,1.0463],[0.0000,-15.0000,-0.0000]]
+  gateways_pos: [[0.7413, 0.6675, 0.0698], [-0.4988, 0.8639, 0.0698], [0.0000, -1.0000, -0.0000]]
   n_seq: 10
 
 ## Network settings
@@ -22,7 +22,7 @@ networks:
     heads: 8
     dim_head: 64
     mlp_dim: 1024
-    dropout: 0
+    dropout: 0.1
 
 
 
@@ -31,7 +31,7 @@ training:
   lr: 1e-4
   weight_decay: 1e-4
   batch_size: 1024
-  total_epoches: 13000
+  total_epoches: 5000
   i_save: 10    # model save epoch
   beta: 0.01   # loss weight
   T_max: 1000  # scheduler T_max

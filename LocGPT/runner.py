@@ -84,6 +84,9 @@ class LocGPT_Runner():
         self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,
                                                                     T_max=kwargs_train['T_max'],eta_min=1e-6,
                                                                     last_epoch=-1)
+        total_params = sum(p.numel() for p in self.locgpt.parameters())
+        self.logger.info(f'Total parameters: {total_params}')
+
 
         ## Train settings
         self.epoch_start = 1
@@ -243,7 +246,7 @@ class LocGPT_Runner():
         """
 
         ## mask 1
-        mask = torch.zeros((B, n_seq))
+        # mask = torch.zeros((B, n_seq))
 
         ## mask 2
         # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
@@ -392,10 +395,12 @@ class LocGPT_Runner():
         self.logger.info("before transform---------------------------")
         pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
+        points_preds_test[..., -1] = 0
         pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
-        # self.logger.info('Error on testing each trace set:\n mean:%.3f\n std:%.3f',
-        #                  np.median(pos_error_test, axis=0).item(), np.std(pos_error_test, axis=0).item())
-        self.logger.info('Error on testset globally mean:%.3f std:%.3f',
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
                          np.median(pos_error_test).item(), np.std(pos_error_test).item())
 
 
@@ -403,16 +408,17 @@ class LocGPT_Runner():
         self.logger.info("after transform---------------------------")
         points_preds_test_A = points_preds_test @ R.T + t
         pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
-        # self.logger.info('After transform, Location error on testing each trace set:\n mean:%s\n std:%s',
-        #                  np.median(pos_error_test_A, axis=0), np.std(pos_error_test_A, axis=0))
-        self.logger.info('Error on testset globally mean:%.3f std:%.3f',
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test_A, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test_A, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
                          np.median(pos_error_test_A).item(), np.std(pos_error_test_A).item())
 
 
         scio.savemat(os.path.join(self.logdir, self.expname, f"test_pos_pred.mat"),
                      {"points_preds":points_preds_test,
                       "points_labels":points_labels_test,
-                      "pos_error":pos_error_test})
+                      "pos_error":pos_error_test_A})
 
         self.error_median_over_epoch.append(np.median(pos_error_test).item())
         self.error_std_over_epoch.append(np.std(pos_error_test).item())
@@ -430,6 +436,7 @@ class LocGPT_Runner():
         # # B = A@R.T + t
         pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
         points_preds_train, points_labels_train = pred_all_train[..., 1:], gt_all_train[..., 1:]
+        points_preds_train[..., -1] = 0
         pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=-1)
         # self.logger.info('Location error on training set each trace median:%s, std:%s',
         #                  np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
@@ -503,9 +510,9 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/fine-tune/direct-s2-40.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--mode', type=str, default='test', help='train or test')
+    parser.add_argument('--config', type=str, default='conf/mcbench/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=2)
+    parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)
 
