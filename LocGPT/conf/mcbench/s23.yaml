@@ -3,14 +3,14 @@ path:
   expname: s23
   datadir: data/mcbench/
   logdir: logs/mcbench/
-  train_file: train_data-s23-seq1.t
-  test_file: test_data-s23-seq1.t
+  train_file: train_data-s23-seq1.pt
+  test_file: test_data-s23-seq1.pt
   load_ckpt: True
 
 
 ## Dataset settings
 dataset:
-  gateways_pos: [[4.9931,    0.2617,   -0.0000],[-4.0451,    2.9389,   -0.0000],[-3.9932,   -3.0091,   -0.0000]]
+  gateways_pos: [[0.7133, 0.0374, -0.0000], [-0.5779, 0.4198, -0.0000], [-0.5705, -0.4299, -0.0000]]
   n_seq: 1
 
 ## Network settings
