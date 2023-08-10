@@ -100,6 +100,7 @@ class LocGPT_Runner():
         self.loss = kwargs_train['loss']
         self.beta = kwargs_train['beta']
         self.i_save = kwargs_train['i_save']
+        self.loc_type = kwargs_train['loc_type']  # 2D or 3D
         self.mask_id = 0
         self.error_median_over_epoch = []
         self.error_std_over_epoch = []
@@ -246,7 +247,7 @@ class LocGPT_Runner():
         """
 
         ## mask 1
-        # mask = torch.zeros((B, n_seq))
+        mask = torch.zeros((B, n_seq))
 
         ## mask 2
         # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
@@ -395,7 +396,10 @@ class LocGPT_Runner():
         self.logger.info("before transform---------------------------")
         pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
         points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
-        points_preds_test[..., -1] = 0
+
+        if self.loc_type == "2D":
+            points_preds_test[..., -1] = 0
+
         pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
         self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
                          np.around(np.median(pos_error_test, axis=0), 3).tolist(),
@@ -436,7 +440,10 @@ class LocGPT_Runner():
         # # B = A@R.T + t
         pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
         points_preds_train, points_labels_train = pred_all_train[..., 1:], gt_all_train[..., 1:]
-        points_preds_train[..., -1] = 0
+
+        if self.loc_type == "2D":
+            points_preds_train[..., -1] = 0
+
         pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=-1)
         # self.logger.info('Location error on training set each trace median:%s, std:%s',
         #                  np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
