@@ -16,7 +16,7 @@ if __name__ == '__main__':
     gateway_pos = kwargs['dataset']['gateways_pos']
     # train_scenes = kwargs['dataset']['train_scenes']
     # test_scenes = kwargs['dataset']['test_scenes']
-    test_scenes = ["s38"]
+    test_scenes = ["s42"]
 
 
     for scene in test_scenes:
