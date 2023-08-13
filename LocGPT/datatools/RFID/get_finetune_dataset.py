@@ -4,7 +4,7 @@
 import yaml
 import torch
 
-confpath = "conf/pretrain/pretrain-exp1.yaml"
+confpath = "conf/pretrain/pretrain-exp3.yaml"
 datapath = "data/mcbench/"
 savepath = "data/fine-tune/"
 
@@ -16,6 +16,7 @@ if __name__ == '__main__':
     gateway_pos = kwargs['dataset']['gateways_pos']
     train_scenes = kwargs['dataset']['train_scenes']
     test_scenes = kwargs['dataset']['test_scenes']
+    test_scenes = ["s20"]
 
 
     for scene in test_scenes:
