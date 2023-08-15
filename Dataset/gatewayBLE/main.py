@@ -23,12 +23,15 @@ port = 1883
 # gateway 3
 topic = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-0C4314EF65A1"
 topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-B43A31EEB7B6"
+topic3 = "silabs/aoa/iq_report/ble-pd-0C4314F46D26/ble-pd-6C5CB145B0D7"
+
 
 # gateway 4
 # topic = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-0C4314EF65A1"
 # topic2 = "silabs/aoa/iq_report/ble-pd-0C4314F46DBF8/ble-pd-B43A31EEB7B6"
 
-topic_array = [(topic, 0), (topic2, 1)]
+
+topic_array = [(topic, 0), (topic2, 1), (topic3, 2)]
 client_id = f'python-mqtt-{random.randint(0, 100)}'
 filename = r'./data.txt'
 
@@ -58,6 +61,9 @@ def subscribe(client: mqtt_client, mc):
         elif msg.topic == topic2:
             data_pub = {"id":2, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
             print("tag 2")
+        elif msg.topic == topic3:
+            data_pub = {"id":3, "frequency": data["channel"], "sequence": data["sequence"], "timestamp": datetime.now().isoformat(), "rssi": data["rssi"], "samples": data["samples"]}
+            print("tag 3")
         mc.sendData(json.dumps(data_pub))
         print("Message received from MQTT and sent to RabbitMQ")
         # with open(filename, 'a') as f:

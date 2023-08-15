@@ -3,8 +3,10 @@
 """
 
 import json
+import os
 
-with open("config.json") as json_file:
+print(os.listdir())
+with open("./config.json") as json_file:
     config = json.load(json_file)
 
 class Paramloader():
