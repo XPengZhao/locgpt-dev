@@ -135,7 +135,7 @@ class LocGPT_Runner():
     def load_pretrained(self):
         """load pretrained model
         """
-        pretrain_dir = os.path.join(self.datadir, "pretrain-exp3.tar")
+        pretrain_dir = os.path.join(self.datadir, "pretrain-wifi-exp4.tar")
         self.logger.info("Load pretrained model from %s", pretrain_dir)
         ckpt = torch.load(pretrain_dir, map_location=self.devices)
 

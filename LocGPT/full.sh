@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Loop over the datasets
-for i in {38..45}
+for i in 40
 do
    # Skip 25 and 27
    # if [ "$i" -eq 01 ] || [ "$i" -eq 02 ]
