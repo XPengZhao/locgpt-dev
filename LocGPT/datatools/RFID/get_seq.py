@@ -2,10 +2,8 @@ import pandas as pd
 import numpy as np
 from einops import rearrange
 import torch
-from bartlett import Bartlett
+from gen_spt import Bartlett
 import random
-import matplotlib.image as plm
-
 
 
 # Set the random seed
@@ -13,7 +11,7 @@ np.random.seed(0)
 random.seed(0)
 
 
-def get_seq_index(num_seq, seq_len=10, max_step=3):
+def get_seq_index(num_seq, seq_len=10, max_step=5):
     """
     return
     ----------
@@ -53,7 +51,10 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 if __name__ == "__main__":
 
     seq_len = 10
-    data_path = "data/ble-exp2/pq504_exp2_merge.csv"
+    scene = "34"
+    data_path = f"data/mcbench/data-s{scene}.csv"
+    save_train_path = f"data/mcbench/train_data-s{scene}-seq{seq_len}.t"
+    save_test_path = f"data/mcbench/test_data-s{scene}-seq{seq_len}.t"
 
     blt = Bartlett()
     df = pd.read_csv(data_path)
@@ -71,24 +72,17 @@ if __name__ == "__main__":
     data_len, b, n = data_seq.shape
 
     # [timestamp_1 + area_1 + pos_3 + spt_324]
-    data_all = torch.zeros((data_len, b, 1+1+3+4*9*36))
+    data_all = torch.zeros((data_len, b, 1+1+3+3*9*36))
     data_all[...,0] = data_seq[..., 0]
-    data_all[...,1:5] = data_seq[..., 2:6]
+    data_all[...,2:5] = data_seq[..., 1:4]
 
     for i in range(0, len(data_seq)):
-        batch_data = data_seq[i]  # (10, 5+16*4)
-        batch_freq = batch_data[:, 1]
-        heatmap1 = blt.get_aoa_heatmap(batch_data[:, 6:6+16], batch_freq).detach().cpu().unsqueeze(1)  # [B, 1, 9, 36]
-
-        # figure = np.zeros((9,36,3))
-        # figure[:,:,0] = heatmap1[0,0].numpy()
-        # plm.imsave(f"test{i}.png", figure)
-
-        heatmap2 = blt.get_aoa_heatmap(batch_data[:, 6+16:6+32], batch_freq).detach().cpu().unsqueeze(1)
-        heatmap3 = blt.get_aoa_heatmap(batch_data[:, 6+32:6+48], batch_freq).detach().cpu().unsqueeze(1)
-        heatmap4 = blt.get_aoa_heatmap(batch_data[:, 6+48:6+64], batch_freq).detach().cpu().unsqueeze(1)
-        heatmap = torch.concat((heatmap1, heatmap2, heatmap3, heatmap4), dim=1)  # [B, 4, 9, 36]
-        heatmap = rearrange(heatmap, 'b c h w -> b (c h w)')  # [10, 4*9*36]
+        batch_data = data_seq[i]  # (10, 4+32*3)
+        heatmap1 = blt.get_aoa_heatmap(batch_data[:, 5:5+32:2]).detach().cpu().unsqueeze(1)  # [B, 1, 9, 36]
+        heatmap2 = blt.get_aoa_heatmap(batch_data[:, 5+32:5+64:2]).detach().cpu().unsqueeze(1)
+        heatmap3 = blt.get_aoa_heatmap(batch_data[:, 5+64:5+96:2]).detach().cpu().unsqueeze(1)
+        heatmap = torch.concat((heatmap1, heatmap2, heatmap3), dim=1)  # [B, 3, 9, 36]
+        heatmap = rearrange(heatmap, 'b c h w -> b (c h w)')  # [10, 3*9*36]
         data_all[i,:,5:] = heatmap
 
     train_len = int(len(data_all) * 0.8)
@@ -98,5 +92,18 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
-    torch.save(train_data, "train_data-pq504.t")
-    torch.save(test_data, "test_data-pq504.t")
+    torch.save(train_data, save_train_path)
+    torch.save(test_data, save_test_path)
+
+    ## save for seq = 1
+    train_data = rearrange(train_data, 'b n d -> (b n) d').unsqueeze(1)
+    test_data = rearrange(test_data, 'b n d -> (b n) d').unsqueeze(1)
+
+
+    print("len train_data", len(train_data))
+    print("len train_data", len(test_data))
+
+    save_train_path = f"data/mcbench/train_data-s{scene}-seq1.pt"
+    save_test_path = f"data/mcbench/test_data-s{scene}-seq1.pt"
+    torch.save(train_data, save_train_path)
+    torch.save(test_data, save_test_path)

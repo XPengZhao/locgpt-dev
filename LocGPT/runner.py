@@ -3,6 +3,7 @@
 """
 import argparse
 import os
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 from shutil import copyfile
 
@@ -83,6 +84,8 @@ class LocGPT_Runner():
         self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,
                                                                     T_max=kwargs_train['T_max'],eta_min=1e-6,
                                                                     last_epoch=-1)
+        total_params = sum(p.numel() for p in self.locgpt.parameters())
+        self.logger.info(f'Total parameters: {total_params}')
 
 
         ## Train settings
@@ -94,7 +97,7 @@ class LocGPT_Runner():
         self.total_epoches = kwargs_train['total_epoches']
         self.beta = kwargs_train['beta']
         self.i_save = kwargs_train['i_save']
-
+        self.mask_id = 0
 
         ## Dataset
         train_data_dir = os.path.join(self.datadir, self.train_file)
@@ -109,7 +112,7 @@ class LocGPT_Runner():
         self.transform_iter = torch.utils.data.DataLoader(train_dataset, self.batch_size,
                                                           shuffle=False, drop_last=False, num_workers=0)
         self.train_iter = torch.utils.data.DataLoader(train_dataset, self.batch_size,
-                                                      shuffle=True, drop_last=True, num_workers=0)
+                                                      shuffle=True, drop_last=False, num_workers=0)
         self.test_iter = torch.utils.data.DataLoader(test_dataset, self.batch_size,
                                                      shuffle=False, drop_last=False, num_workers=0)
         self.logger.debug("transform_iter length:%s, train_iter length:%s, test_iter length:%s",
@@ -126,7 +129,6 @@ class LocGPT_Runner():
     def load_checkpoints(self):
         """load checkpoints and epoch
         """
-        epoch_start = 1
         ckptsdir = os.path.join(self.logdir, self.expname, 'ckpts')
         if not os.path.exists(ckptsdir):
             os.makedirs(ckptsdir)
@@ -142,7 +144,7 @@ class LocGPT_Runner():
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
             self.cosine_schedule = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer,T_max=20,eta_min=1e-5)
             self.cosine_schedule.load_state_dict(ckpt['schedule_state_dict'])
-            self.epoch_start = ckpt['epoch_start']
+            self.epoch_start = ckpt['epoch_start'] + 1
 
 
     def saveckpts(self):
@@ -184,66 +186,30 @@ class LocGPT_Runner():
 
     def get_random_mask(self, B, n_seq):
         """randomly sample in one sequence
+        Return
+        -------------
+        mask: [B, n_seq]
         """
 
-        num_unmasked = torch.randint(1, n_seq + 1, (B,))
-        mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+        ## mask 1
+        # mask = torch.zeros((B, n_seq))
 
-        # Unmask the first `n` items in each row
-        for i in range(B):
-            mask[i, :num_unmasked[i]] = 0
+        ## mask 2
+        # mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+        # mask_start = torch.randint(0, n_seq, (B,))  # [B,]
+        # mask_len = torch.randint(1, n_seq+1, (B,))
+        # mask_end = torch.min(mask_start + mask_len, torch.tensor(n_seq))
+        # for i in range(B):
+        #     mask[i, mask_start[i]:mask_end[i]] = 0
+
+        ## mask 3
+        mask = torch.ones((B, n_seq)) # Initialize the mask with all ones
+        mask[:, 0:self.mask_id+1] = 0
+        self.mask_id = (self.mask_id + 1) % n_seq
+
+
         mask = mask.eq(1).to(self.devices)   # B, seq
         return mask
-
-
-    def train_network_teaching_force(self):
-
-        self.locgpt.train()
-        total_num = len(self.train_iter.dataset)
-        num_batches = len(self.train_iter)
-        log_step_interval = 1
-        print(total_num, num_batches)
-        for epoch in range(self.epoch_start, self.total_epoches):
-            with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
-                for step, (enc_token, dec_token) in enumerate(self.transform_iter):
-                    spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
-                    label = self.train_label[dec_token.view(-1)].to(self.devices)
-                    area_tagpos = label[..., 1:5]    # [B, n_seq, 4]
-
-                    ind = torch.arange(self.n_seq)
-                    enc_token = enc_token*self.n_seq + ind
-                    dec_token = dec_token*self.n_seq + ind
-                    enc_token = enc_token.to(self.devices, dtype=torch.int32)
-                    dec_token = dec_token.to(self.devices, dtype=torch.int32)    #[B, n_seq]
-                    B, n_seq = enc_token.shape
-
-                    dec_input = area_tagpos[:, 0:-1, 1:4]  # [B, n_seq-1, 3]
-                    start_token = torch.zeros((B, 1, 3), dtype=torch.float32).to(self.devices)
-                    dec_input = torch.concat((start_token, dec_input), dim=1)  # [B, n_seq, 3]
-
-                    mask = self.get_random_mask(B, n_seq)
-                    enc_token.masked_fill_(mask, -1)
-                    dec_token.masked_fill_(mask, -1)
-
-                    self.optimizer.zero_grad()
-
-                    output = self.locgpt(enc_token, spt, dec_token, dec_input)  # [B, n_seq, 4]
-                    l1, l2, l3 = self.criterion(output, area_tagpos, mask)
-                    loss = l3
-                    loss.backward()
-
-                    self.optimizer.step()
-                    global_iter_num = epoch * num_batches + step + 1
-                    pbar.update(1)
-                    pbar.set_postfix_str(f"l1 loss: {l1.item():.6f}, l2 loss: {l2.item():.6f}, lr: {self.optimizer.param_groups[0]['lr']:.9f}")
-                    if global_iter_num % log_step_interval == 0:
-                        self.logger_tb.add_scalar("l1 loss", l1.item(), global_step=global_iter_num)
-                        self.logger_tb.add_scalar("l2 loss", l2.item(), global_step=global_iter_num)
-            self.cosine_schedule.step()
-            self.current_epoch = epoch
-
-            if self.current_epoch % self.i_save == 0:
-                self.saveckpts()
 
 
 
@@ -256,7 +222,7 @@ class LocGPT_Runner():
         num_batches = len(self.train_iter)
         log_step_interval = 1
         print(total_num, num_batches)
-        for epoch in range(self.epoch_start, self.total_epoches):
+        for epoch in range(self.epoch_start, self.total_epoches+1):
             with tqdm(total=num_batches, desc=f"Epoch {epoch}/{self.total_epoches}") as pbar:
                 for step, (enc_token, dec_token) in enumerate(self.train_iter):
                     spt = self.train_spt[enc_token.view(-1)].to(self.devices)   # [B, n_seq, 3*9*36]
@@ -287,7 +253,8 @@ class LocGPT_Runner():
                         timestamp_chunk, spt_chunk = timestamp[:, 0:j, :], spt[:, 0:j, :]
                         output = self.locgpt(timestamp_chunk, enc_token_chunk, spt_chunk,
                                              dec_token_chunk, dec_input_chunk)  # [B, n_seq, 4]
-                        dec_input_chunk = torch.concat((dec_input_chunk, output[:,-1:,1:]), dim=1)
+                        input_mask =  torch.logical_not(mask[:, j-1:j]).unsqueeze(-1)
+                        dec_input_chunk = torch.concat((dec_input_chunk, input_mask*output[:,-1:,1:]), dim=1)
                         outputs[:, j-1:j, :] = output[:,-1:,:]
 
                     l1, l2, l3 = self.criterion(output, area_tagpos, mask)
@@ -313,10 +280,9 @@ class LocGPT_Runner():
         """
         Returns
         -----------
-        pred_all: [B, 4]. predict results (s, x, y, z)
-        gt_all: [B, 4]. ground truth results (s, x, y, z)
+        pred_all: [B, n_seq, 4]. predict results (s, x, y, z)
+        gt_all: [B, n_seq, 4]. ground truth results (s, x, y, z)
         """
-
         self.locgpt.eval()
         dataset_len = len(dataset.dataset)
         gt_all = np.zeros((dataset_len, self.n_seq, 4))
@@ -352,53 +318,86 @@ class LocGPT_Runner():
                 pred_all[i*self.batch_size:(i+1)*self.batch_size] = preds
                 gt_all[i*self.batch_size:(i+1)*self.batch_size] = area_tagpos
 
-        pred_all = rearrange(pred_all, 'b n d -> (b n) d')
-        gt_all = rearrange(gt_all, 'b n d -> (b n) d')
+        # pred_all = rearrange(pred_all, 'b n d -> (b n) d')
+        # gt_all = rearrange(gt_all, 'b n d -> (b n) d')
 
         return pred_all, gt_all
 
 
     def eval_network(self):
 
-        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
-        points_preds_train, points_labels_train = pred_all_train[:, 1:], gt_all_train[:, 1:]
-        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=1)
-        self.logger.info('train data Median error on training set:%s', np.median(pos_error_train))
-        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
-                     {"points_preds":points_preds_train,
-                      "points_labels":points_labels_train,
-                      "pos_error":pos_error_train})
+        self.logger.info("Start eval network ###################################")
+        R,t = self.get_transform()
 
+        self.logger.info("before transform---------------------------")
         pred_all_test, gt_all_test = self.pred(self.test_iter, self.test_spt, self.test_label)
-        points_preds_test, points_labels_test = pred_all_test[:, 1:], gt_all_test[:, 1:]
-        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=1)
-        scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
-                     {"points_preds":points_preds_test,
-                      "points_labels":points_labels_test,
-                      "pos_error":pos_error_test})
+        points_preds_test, points_labels_test = pred_all_test[..., 1:], gt_all_test[..., 1:]
+        pos_error_test = np.linalg.norm(points_labels_test-points_preds_test, axis=-1)
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test).item(), np.std(pos_error_test).item())
 
-        self.logger.info('Location Median Error on testing set:%s, std:%s', np.median(pos_error_test),
-                                                                            np.std(pos_error_test))
+
+        # After Transform
+        self.logger.info("after transform---------------------------")
+        points_preds_test_A = points_preds_test @ R.T + t
+        pos_error_test_A = np.linalg.norm(points_labels_test-points_preds_test_A, axis=-1)
+        self.logger.info('Error on test set w/ history:\n mean:%s\n std:%s',
+                         np.around(np.median(pos_error_test_A, axis=0), 3).tolist(),
+                         np.around(np.std(pos_error_test_A, axis=0), 3).tolist())
+        self.logger.info('Error on test set globally mean:%.3f std:%.3f',
+                         np.median(pos_error_test_A).item(), np.std(pos_error_test_A).item())
+
+
+        scio.savemat(os.path.join(self.logdir, self.expname, "test_pos_pred.mat"),
+                     {"points_preds":points_preds_test_A,
+                      "points_labels":points_labels_test,
+                      "pos_error":pos_error_test_A})
+
+
+
+
 
     def get_transform(self):
 
         # # R = 3x3 rotation matrix
         # # t = 3 column vector
         # # B = A@R.T + t
-        pred_all, gt_all = self.pred(self.transform_iter)
-        pred_pos, gt_pos = pred_all[:, 1:], gt_all[:, 1:]
-        pos_error = np.linalg.norm(gt_pos-pred_pos, axis=1)
+        pred_all_train, gt_all_train = self.pred(self.transform_iter, self.train_spt, self.train_label)
+        points_preds_train, points_labels_train = pred_all_train[..., 1:], gt_all_train[..., 1:]
+        pos_error_train = np.linalg.norm(points_labels_train-points_preds_train, axis=-1)
+        self.logger.info('Location error on training set each trace median:%s, std:%s',
+                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+        self.logger.info('Location error on training set globally median:%s, std:%s',
+                         np.median(pos_error_train), np.std(pos_error_train))
 
-        print('train data Median error before transform:', np.median(pos_error))
+        points_preds_train = rearrange(points_preds_train, 'b n d -> (b n) d')
+        points_labels_train = rearrange(points_labels_train, 'b n d -> (b n) d')
 
-        R, t = self.learn_Rt(gt_pos, pred_pos)
+        # SVD method
+        R, t = self.learn_Rt(points_labels_train, points_preds_train)
         R, t = R.detach().numpy(), t.detach().numpy()
-        # np.savetxt('gt_pre.txt', np.concatenate((gt_pos,pred_pos), axis=-1), fmt='%.3f')
 
-        pred_pos_A = pred_pos @ R.T + t
-        pos_error = np.linalg.norm(gt_pos-pred_pos_A, axis=1)
-        print('train data Median error after transform', np.median(pos_error))
+        points_preds_train_A = points_preds_train @ R.T + t
+        points_preds_train_A = rearrange(points_preds_train_A, '(b n) d -> b n d', n=self.n_seq)
+        points_labels_train = rearrange(points_labels_train, '(b n) d -> b n d', n=self.n_seq)
+        pos_error_train = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)
+        self.logger.info('After transform, Location error on training set each trace median:%s, std:%s',
+                         np.median(pos_error_train, axis=0), np.std(pos_error_train, axis=0))
+        self.logger.info('After transform, Location Error on training set globally median:%s, std:%s',
+                         np.median(pos_error_train), np.std(pos_error_train))
+
+        ## save results and loggers
+        scio.savemat(os.path.join(self.logdir, self.expname, "train_pos_pred.mat"),
+                     {"points_preds":points_preds_train,
+                      "points_labels":points_labels_train,
+                      "pos_error":pos_error_train})
+
         return R, t
+
+
 
 
     def learn_Rt(self, coords_A, coords_B):
@@ -418,7 +417,7 @@ class LocGPT_Runner():
         optimizer = optim.SGD([R, t], lr=0.05)
 
         # Training loop
-        for i in range(10000):  # 1000 iterations
+        for i in range(10001):  # 1000 iterations
             optimizer.zero_grad()  # Clear previous gradients
 
             # Apply the transformation
@@ -427,7 +426,7 @@ class LocGPT_Runner():
             loss.backward()
             optimizer.step()
 
-            if i % 500 == 0:  # Print loss every 100 iterations
+            if i % 5000 == 0:  # Print loss every 100 iterations
                 print(f"Iteration {i}: Loss = {loss.item()}")
 
         return R, t
@@ -437,8 +436,8 @@ class LocGPT_Runner():
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='conf/mcbench-s01.yaml', help='config file path')
-    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--config', type=str, default='conf/mcbench/mcbench-s02.yaml', help='config file path')
+    parser.add_argument('--gpu', type=int, default=2)
     parser.add_argument('--mode', type=str, default='train')
     args = parser.parse_args()
     torch.cuda.set_device(args.gpu)

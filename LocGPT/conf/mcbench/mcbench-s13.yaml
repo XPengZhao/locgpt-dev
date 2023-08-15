@@ -1,0 +1,37 @@
+## Path settings
+path:
+  expname: s13
+  datadir: data/mcbench/
+  logdir: logs/mcbench/
+  train_file: train_data-s13-seq10.t
+  test_file: test_data-s13-seq10.t
+  load_ckpt: True
+
+
+## Dataset settings
+dataset:
+  gateways_pos: [[-34.9520,   -1.8318,   -0.0000],[10.8156,   33.2870,   -0.0000],[-7.2769,  -34.2352,   -0.0000]]
+  n_seq: 10
+
+## Network settings
+networks:
+  init_weight: true
+  transformer:
+    dim: 325
+    depth: 2
+    heads: 8
+    dim_head: 64
+    mlp_dim: 1024
+    dropout: 0
+
+
+
+## Training settings
+training:
+  lr: 1e-4
+  weight_decay: 1e-4
+  batch_size: 1024
+  total_epoches: 11000
+  i_save: 10    # model save epoch
+  beta: 0.01   # loss weight
+  T_max: 1000  # scheduler T_max

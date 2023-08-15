@@ -10,6 +10,9 @@ class Bartlett():
 
     def __init__(self, device=None):
 
+        self.a_step = 1 * 360
+        self.e_step = 1 * 90
+
         if device is None:
             device = 'cuda' if tr.cuda.is_available() else 'cpu'
         self.device = device
@@ -30,13 +33,12 @@ class Bartlett():
     def get_theory_phase(self, freq):
         """get theory phase, return (360x90)x16 array
         """
-        a_step = 1 * 36
-        e_step = 1 * 9
-        spacealpha = tr.linspace(0, np.pi * 2 * (1 - 1 / 36), a_step)  # 0-2pi
-        spacebeta = tr.linspace(0, np.pi / 2 * (1 - 1 / 9), e_step)  # 0-pi/2
 
-        alpha = spacealpha.expand(e_step, -1).flatten()  # alpha[0,1,..0,1..]
-        beta = spacebeta.expand(a_step, -1).permute(1, 0).flatten()  # beta[0,0,..1,1..]
+        spacealpha = tr.linspace(0, np.pi * 2 * (1 - 1 / self.a_step), self.a_step)  # 0-2pi
+        spacebeta = tr.linspace(0, np.pi / 2 * (1 - 1 / self.e_step), self.e_step)  # 0-pi/2
+
+        alpha = spacealpha.expand(self.e_step, -1).flatten()  # alpha[0,1,..0,1..]
+        beta = spacebeta.expand(self.a_step, -1).permute(1, 0).flatten()  # beta[0,0,..1,1..]
 
         N = freq.shape[0]  # batch size
         freq = freq.view(N, 1, 1)  # add two dimensions for antenna and angle
@@ -55,7 +57,7 @@ class Bartlett():
         cosd = (tr.cos(delta_phase)).sum(1)
         sind = (tr.sin(delta_phase)).sum(1)
         p = tr.sqrt(cosd * cosd + sind * sind) / 16
-        p = p.view(9,36)
+        p = p.view(self.e_step, self.a_step)
         return p
 
 
@@ -70,5 +72,5 @@ class Bartlett():
         cosd = (tr.cos(delta_phase)).sum(1)  # sum over antenna dimension
         sind = (tr.sin(delta_phase)).sum(1)  # sum over antenna dimension
         p = tr.sqrt(cosd * cosd + sind * sind) / 16  # calculate magnitude
-        p = p.view(N, 9, 36)  # reshape into (N, 9, 36) tensor
+        p = p.view(N, self.e_step, self.a_step)  # reshape into (N, 9, 36) tensor
         return p

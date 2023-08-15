@@ -136,34 +136,6 @@ def get_embedder(multires, input_ch, enable=True):
     return embed, embedder_obj.out_dim
 
 
-class PositionalEncoding(nn.Module):
-
-  def __init__(self, d_model, dropout=.1, max_len=1024):
-    super(PositionalEncoding, self).__init__()
-    self.dropout = nn.Dropout(p=p_drop)
-
-    positional_encoding = torch.zeros(max_len, d_model) # [max_len, d_model]
-    position = torch.arange(0, max_len).float().unsqueeze(1) # [max_len, 1]
-
-    div_term = torch.exp(torch.arange(0, d_model, 2).float() *
-                         (-torch.log(torch.Tensor([10000])) / d_model)) # [max_len / 2]
-
-    positional_encoding[:, 0::2] = torch.sin(position * div_term) # even
-    positional_encoding[:, 1::2] = torch.cos(position * div_term) # odd
-
-    # [max_len, d_model] -> [1, max_len, d_model] -> [max_len, 1, d_model]
-    positional_encoding = positional_encoding.unsqueeze(0).transpose(0, 1)
-
-    # register pe to buffer and require no grads
-    self.register_buffer('pe', positional_encoding)
-
-  def forward(self, x):
-    # x: [seq_len, batch, d_model]
-    # we can add positional encoding to x directly, and ignore other dimension
-    x = x + self.pe[:x.size(0), ...]
-
-    return self.dropout(x)
-
 
 
 def get_padding_mask(seq_q, seq_k):
@@ -301,8 +273,9 @@ class Encoder(nn.Module):
         enc_input: tensor, [B, n_seq, feature_dim]
         """
         attn_padding_mask = get_padding_mask(enc_token, enc_token) # [batch, target_len, target_len]
+        x = enc_input
         for attn, ff in self.layers:
-            x = attn(enc_input, q_input=enc_input, k_input=enc_input, v_input=enc_input, attn_mask=attn_padding_mask)
+            x = attn(x, q_input=x, k_input=x, v_input=x, attn_mask=attn_padding_mask)
             x = ff(x, inputs=x)
         omega = self.mlp_head(x)  # [B, n_seq, 2]
 
@@ -349,8 +322,9 @@ class Decoder(nn.Module):
     dec_input += self.pos_embedding                  # 加位置嵌入（直接加）      (b, 1, dim)
 
     # masked mutlihead attention
+    x = dec_input
     for attn1, attn2, ff in self.layers:
-        x = attn1(dec_input,  q_input=dec_input, k_input=dec_input, v_input=dec_input, attn_mask=attn1_mask)
+        x = attn1(x,  q_input=x, k_input=x, v_input=x, attn_mask=attn1_mask)
         x = attn2(x,  q_input=x, k_input=enc_output, v_input=enc_output, attn_mask=attn2_mask)
         x = ff(x, inputs=x)
     return x
