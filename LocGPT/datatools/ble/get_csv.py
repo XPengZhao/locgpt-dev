@@ -15,7 +15,7 @@ mod_phase = lambda x: np.mod(x + np.pi, 2 * np.pi) - np.pi
 
 database = "LocGPT"
 ip = "158.132.255.110"
-merge_collection = "pq504_exp1_merge"
+merge_collection = "pq504_exp2_s46_merge"
 gateways = ["gateway1", "gateway2", "gateway3", "gateway4"]
 
 ## BLE channel
@@ -37,8 +37,8 @@ def get_tag_position(position, orientation):
                                 orientation[1], orientation[2])
 
     # Relative positions of p1 and p2 to p0
-    relative_position_tag1 = np.array([0, -0.3, 0])
-    relative_position_tag2 = np.array([0, 0.3, 0])
+    relative_position_tag1 = np.array([0.3, 0, 0])
+    relative_position_tag2 = np.array([-0.3, 0, 0])
 
     # Calculate global positions of p1 and p2
     position_tag1 = position_p0 + orientation_p0.rotate(relative_position_tag1)

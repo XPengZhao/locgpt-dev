@@ -10,8 +10,8 @@ class Bartlett():
 
     def __init__(self, device=None):
 
-        self.a_step = 1 * 360
-        self.e_step = 1 * 90
+        self.a_step = 1 * 36
+        self.e_step = 1 * 9
 
         if device is None:
             device = 'cuda' if tr.cuda.is_available() else 'cpu'

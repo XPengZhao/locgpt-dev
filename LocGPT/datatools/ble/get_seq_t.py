@@ -52,8 +52,8 @@ def get_seq_index(num_seq, seq_len=10, max_step=3):
 
 if __name__ == "__main__":
 
-    seq_len = 10
-    data_path = "data/ble-exp2/pq504_exp2_merge.csv"
+    seq_len = 1
+    data_path = "data/ble/pq504_exp2_s46_merge.csv"
 
     blt = Bartlett()
     df = pd.read_csv(data_path)
@@ -98,5 +98,5 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
-    torch.save(train_data, "train_data-pq504.t")
-    torch.save(test_data, "test_data-pq504.t")
+    torch.save(train_data, "train_data-s46-seq1.t")
+    torch.save(test_data, "test_data-s46-seq1.t")
