@@ -383,6 +383,7 @@ class LocGPT_Runner():
         R, t = R.detach().numpy(), t.detach().numpy()
 
         points_preds_train_A = points_preds_train @ R.T + t
+        points_preds_train = rearrange(points_preds_train, '(b n) d -> b n d', n=self.n_seq)
         points_preds_train_A = rearrange(points_preds_train_A, '(b n) d -> b n d', n=self.n_seq)
         points_labels_train = rearrange(points_labels_train, '(b n) d -> b n d', n=self.n_seq)
         pos_error_train = np.linalg.norm(points_preds_train_A-points_labels_train, axis=-1)

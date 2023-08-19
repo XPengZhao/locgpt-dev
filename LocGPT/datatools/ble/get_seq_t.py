@@ -98,5 +98,5 @@ if __name__ == "__main__":
     print("len train_data", len(train_data))
     print("len train_data", len(test_data))
 
-    torch.save(train_data, "train_data-s46-seq1.t")
-    torch.save(test_data, "test_data-s46-seq1.t")
+    torch.save(train_data, "train_data-s46-seq1.pt")
+    torch.save(test_data, "test_data-s46-seq1.pt")

@@ -6,10 +6,10 @@ from pymongo import MongoClient
 
 ## gateway position
 
-# gateway1_pos = [-1.69, -2.90, -0.1]
-# gateway2_pos = [1.20, -1.60, -0.01]
-# gateway3_pos = [3.07, 8.22, 0.07]
-# gateway4_pos = [-2.23, 4.70, -0.1]
+gateway1_pos = [-1.69, -2.90, -0.1]
+gateway2_pos = [1.20, -1.60, -0.01]
+gateway3_pos = [3.07, 8.22, 0.07]
+gateway4_pos = [-2.23, 4.70, -0.1]
 
 # gateway_pos = np.array([gateway1_pos, gateway2_pos, gateway3_pos, gateway4_pos])
 # center_pos = np.mean(gateway_pos, axis=0)
@@ -45,12 +45,15 @@ def get_mean_rss():
 
     all_rssi = np.array(all_rssi)
     print("mean rssi: ", np.mean(all_rssi))
-    print("min x: ", np.min(all_pos[:,0]))
-    print("max x: ", np.max(all_pos[:,0]))
-    print("min y: ", np.min(all_pos[:,1]))
-    print("max y: ", np.max(all_pos[:,1]))
+    pos_to_gateway1 = np.mean(np.linalg.norm(all_pos - gateway1_pos, axis=1))
+    pos_to_gateway2 = np.mean(np.linalg.norm(all_pos - gateway2_pos, axis=1))
+    pos_to_gateway3 = np.mean(np.linalg.norm(all_pos - gateway3_pos, axis=1))
+    pos_to_gateway4 = np.mean(np.linalg.norm(all_pos - gateway4_pos, axis=1))
+    pos_to_gateway = np.mean([pos_to_gateway1, pos_to_gateway2, pos_to_gateway3, pos_to_gateway4])
+
     area = (np.max(all_pos[:,0]) - np.min(all_pos[:,0])) * (np.max(all_pos[:,1]) - np.min(all_pos[:,1]))
     print("area: ", area)
+    print("pos_to_gateway: ", pos_to_gateway)
 
 
 if __name__ == '__main__':

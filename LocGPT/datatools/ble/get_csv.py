@@ -10,6 +10,8 @@ from pyquaternion import Quaternion
 from bartlett import Bartlett
 import matplotlib.image as plm
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 
 mod_phase = lambda x: np.mod(x + np.pi, 2 * np.pi) - np.pi
 
@@ -70,6 +72,11 @@ def get_cfo_phase(gateway_constant_phase):
     print(f"phase_after_compensate: {np.mean(phase_after_compensate)}")
     cfo = cfo_phase / (2 * np.pi * 1e-6)
     print(f"cfo: {cfo}")
+
+    # plt.figure()
+    # plt.plot(gateway_constant_phase)
+    # plt.plot(mod_phase(gateway_constant_phase - compensate_phase))
+    # plt.savefig("cfo.png")
 
     return cfo_phase
 
